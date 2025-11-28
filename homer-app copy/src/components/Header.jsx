@@ -55,8 +55,9 @@ const Header = () => {
                     <Typography
                         variant="h4"
                         sx={{
-                            fontFamily: '"Pacifico", cursive',
-                            fontWeight: 'normal',
+                            fontFamily: '"Adelia", "Pacifico", cursive',
+                            fontSize: { xs: '1.2rem', sm: '1.4rem' },
+                            fontWeight: 400,
                             cursor: 'pointer'
                         }}
                         onClick={() => navigate('/')}

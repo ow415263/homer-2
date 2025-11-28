@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Typography, Button, Paper, Grid, IconButton, Snackbar, Alert, Badge, Tabs, Tab } from '@mui/material';
+import { Box, Typography, Button, Paper, Snackbar, Alert, Badge, Tabs, Tab } from '@mui/material';
 import SenderFlow from '../components/SenderFlow';
 import ReceiverFlow from '../components/ReceiverFlow';
 import CreateIcon from '@mui/icons-material/Create';
@@ -11,16 +11,19 @@ import { useLayout } from '../context/LayoutContext';
 import { motion } from 'framer-motion';
 import { sentPostcards, receivedPostcards } from '../data/mockData';
 
+const FALLBACK_CARD_IMAGE = 'https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?auto=format&fit=crop&w=800&q=80';
+
+const buildInitialCards = () => (
+    [...sentPostcards.map(card => ({ ...card, type: 'sent' })),
+    ...receivedPostcards.map(card => ({ ...card, type: 'received' }))]
+        .sort((a, b) => new Date(b.date) - new Date(a.date))
+);
+
 const Exchange = () => {
     const [viewMode, setViewMode] = useState('default'); // 'default', 'sender', 'receiver'
     const [tabValue, setTabValue] = useState(0); // 0: All, 1: Sent, 2: Received
+    const [cards, setCards] = useState(() => buildInitialCards());
     const { setIsFullscreen } = useLayout();
-
-    // Combine sent and received postcards with a type indicator
-    const allCards = [
-        ...sentPostcards.map(card => ({ ...card, type: 'sent' })),
-        ...receivedPostcards.map(card => ({ ...card, type: 'received' }))
-    ].sort((a, b) => new Date(b.date) - new Date(a.date)); // Sort by date, newest first
 
     const [notification, setNotification] = useState({ open: false, message: '' });
     const [hasPendingWrite, setHasPendingWrite] = useState(false);
@@ -41,9 +44,23 @@ const Exchange = () => {
     };
 
     const handleSenderComplete = (data) => {
-        // In a real app, this would add to the backend
-        // For now, just clear the pending flag
+        const previewMedia = data.media || [];
+        const primaryMedia = previewMedia[0];
+        const newCard = {
+            id: Date.now(),
+            title: data.title || 'New Memory',
+            description: data.description,
+            date: data.date,
+            image: primaryMedia?.url || FALLBACK_CARD_IMAGE,
+            type: 'sent',
+            sender: 'You',
+            media: previewMedia,
+            location: data.location ? { name: data.location } : undefined
+        };
+
+        setCards(prev => [newCard, ...prev]);
         setHasPendingWrite(false);
+        setNotification({ open: true, message: 'Memory added to your history.' });
         setViewMode('default');
     };
 
@@ -68,9 +85,9 @@ const Exchange = () => {
     };
 
     // Filter cards based on tab
-    const displayCards = tabValue === 0 ? allCards :
-        tabValue === 1 ? allCards.filter(c => c.type === 'sent') :
-            allCards.filter(c => c.type === 'received');
+    const displayCards = tabValue === 0 ? cards :
+        tabValue === 1 ? cards.filter(c => c.type === 'sent') :
+            cards.filter(c => c.type === 'received');
 
     // API Key from prompt
     const GOOGLE_MAPS_API_KEY = 'AIzaSyCutvv7f2R1FV-ScEC_6gJfvMBCFAAYJdw';
@@ -82,8 +99,12 @@ const Exchange = () => {
     if (viewMode === 'receiver') {
         const cardData = selectedCard ? {
             title: selectedCard.title,
-            description: selectedCard.sender ? `From: ${selectedCard.sender}` : 'Your memory',
-            media: selectedCard.image ? [{ url: selectedCard.image, type: 'image/jpeg' }] : [],
+            description: selectedCard.description || (selectedCard.sender ? `From: ${selectedCard.sender}` : 'Your memory'),
+            media: selectedCard.media?.length
+                ? selectedCard.media
+                : selectedCard.image
+                    ? [{ url: selectedCard.image, type: 'image/jpeg' }]
+                    : [],
             date: selectedCard.date,
             location: selectedCard.location
         } : {
@@ -105,20 +126,6 @@ const Exchange = () => {
 
     return (
         <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', gap: 3 }}>
-            {/* Stats Section */}
-            <Paper elevation={0} sx={{ p: 2, borderRadius: 4, bgcolor: 'primary.light', color: 'primary.contrastText' }}>
-                <Grid container spacing={2} textAlign="center">
-                    <Grid item xs={6}>
-                        <Typography variant="h4" fontWeight="bold">{sentPostcards.length}</Typography>
-                        <Typography variant="caption">Cards Sent</Typography>
-                    </Grid>
-                    <Grid item xs={6}>
-                        <Typography variant="h4" fontWeight="bold">{receivedPostcards.length}</Typography>
-                        <Typography variant="caption">Cards Received</Typography>
-                    </Grid>
-                </Grid>
-            </Paper>
-
             {/* Actions Section */}
             <Box sx={{ display: 'flex', gap: 2 }}>
                 <Badge
