@@ -6,6 +6,7 @@ import Home from './pages/Home';
 import Exchange from './pages/Exchange';
 import Profile from './pages/Profile';
 import Cards from './pages/Cards';
+import Login from './pages/Login';
 import Header from './components/Header';
 import ChatButton from './components/ChatButton';
 import { LayoutProvider, useLayout } from './context/LayoutContext';
@@ -33,6 +34,7 @@ const AppContent = () => {
         <Route path="/cards" element={<Cards />} />
         <Route path="/exchange" element={<Exchange />} />
         <Route path="/profile" element={<Profile />} />
+        <Route path="/login" element={<Login />} />
       </Routes>
     </Box>
   );

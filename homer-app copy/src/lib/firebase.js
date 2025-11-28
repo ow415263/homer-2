@@ -1,5 +1,7 @@
 import { initializeApp } from 'firebase/app';
 import { getAnalytics, isSupported as analyticsIsSupported } from 'firebase/analytics';
+import { getFirestore } from 'firebase/firestore';
+import { getStorage } from 'firebase/storage';
 
 const firebaseConfig = {
     apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -12,6 +14,8 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const storage = getStorage(app);
 
 let analytics;
 if (typeof window !== 'undefined') {
@@ -26,4 +30,4 @@ if (typeof window !== 'undefined') {
         });
 }
 
-export { app, analytics };
+export { app, analytics, db, storage };

@@ -4,12 +4,14 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import PersonIcon from '@mui/icons-material/Person';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import AutoFixHighIcon from '@mui/icons-material/AutoFixHigh';
+import { useAuth } from '../context/AuthContext';
 
 const Header = () => {
     const navigate = useNavigate();
     const location = useLocation();
     const isProfilePage = location.pathname === '/profile';
     const isCardsPage = location.pathname === '/cards';
+    const { user } = useAuth();
 
     const handleBack = () => {
         navigate(-1); // Go back to previous page
@@ -87,18 +89,31 @@ const Header = () => {
                                 Custom
                             </Button>
                         )}
-                        <IconButton
-                            onClick={() => navigate('/profile')}
-                            sx={{
-                                color: 'white',
-                                bgcolor: 'transparent',
-                                '&:hover': {
-                                    bgcolor: 'rgba(255, 255, 255, 0.1)'
-                                }
-                            }}
-                        >
-                            <PersonIcon />
-                        </IconButton>
+                        {user ? (
+                            <IconButton
+                                onClick={() => navigate('/profile')}
+                                sx={{
+                                    color: 'white',
+                                    bgcolor: 'transparent',
+                                    '&:hover': {
+                                        bgcolor: 'rgba(255, 255, 255, 0.1)'
+                                    }
+                                }}
+                            >
+                                <PersonIcon />
+                            </IconButton>
+                        ) : (
+                            <Button
+                                color="inherit"
+                                onClick={() => navigate('/login')}
+                                sx={{
+                                    textTransform: 'none',
+                                    fontWeight: 'bold'
+                                }}
+                            >
+                                Login
+                            </Button>
+                        )}
                     </Box>
                 </>
             )}
