@@ -1,6 +1,6 @@
 steps:
   - name: gcr.io/k8s-skaffold/pack
-    dir: "homer-app copy"
+    dir: homer-app
     args:
       - build
       - gcr.io/$PROJECT_ID/homer-app
