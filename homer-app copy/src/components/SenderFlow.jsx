@@ -4,7 +4,9 @@ import AddPhotoAlternateIcon from '@mui/icons-material/AddPhotoAlternate';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
 import CloseIcon from '@mui/icons-material/Close';
 import DeleteIcon from '@mui/icons-material/Delete';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import gsap from 'gsap';
+import { uploadMedia } from '../lib/db';
 
 const SenderFlow = ({ onComplete, onExit }) => {
     const [loading, setLoading] = useState(false);
@@ -16,10 +18,40 @@ const SenderFlow = ({ onComplete, onExit }) => {
     const [title, setTitle] = useState('');
     const [description, setDescription] = useState('');
     const [location, setLocation] = useState('');
+    const [uploadedMedia, setUploadedMedia] = useState([]);
 
+    // Load draft from localStorage on mount
     useEffect(() => {
-        // Pulsing animation removed as per user request
+        const savedDraft = localStorage.getItem('homer-message-draft');
+        if (savedDraft) {
+            try {
+                const draft = JSON.parse(savedDraft);
+                setTitle(draft.title || '');
+                setDescription(draft.description || '');
+                setLocation(draft.location || '');
+                // Note: We can't restore media previews from localStorage due to size limitations
+                // Media would need to be stored differently (e.g., IndexedDB) if needed
+            } catch (error) {
+                console.error('Failed to load draft:', error);
+            }
+        }
     }, []);
+
+    // Save draft to localStorage whenever form data changes
+    useEffect(() => {
+        const draft = {
+            title,
+            description,
+            location,
+            timestamp: Date.now()
+        };
+        localStorage.setItem('homer-message-draft', JSON.stringify(draft));
+    }, [title, description, location]);
+
+    // Clear draft when successfully submitted
+    const clearDraft = () => {
+        localStorage.removeItem('homer-message-draft');
+    };
 
     const handleFileChange = (event) => {
         const files = Array.from(event.target.files);
@@ -27,7 +59,7 @@ const SenderFlow = ({ onComplete, onExit }) => {
             files.forEach(file => {
                 const reader = new FileReader();
                 reader.onloadend = () => {
-                    setMediaPreviews(prev => [...prev, { url: reader.result, type: file.type }]);
+                    setMediaPreviews(prev => [...prev, { url: reader.result, type: file.type, file }]);
                 };
                 reader.readAsDataURL(file);
             });
@@ -40,24 +72,45 @@ const SenderFlow = ({ onComplete, onExit }) => {
         setMediaPreviews(prev => prev.filter((_, i) => i !== index));
     };
 
-    const handleSubmit = () => {
+    const handleSubmit = async () => {
         setLoading(true);
-        // Simulate API call
-        setTimeout(() => {
+        try {
+            let uploadedMediaUrls = [];
+
+            // Only upload if there are media files
+            if (mediaPreviews.length > 0) {
+                uploadedMediaUrls = await Promise.all(mediaPreviews.map(async (media, index) => {
+                    // Convert data URL to Blob
+                    const response = await fetch(media.url);
+                    const blob = await response.blob();
+                    const file = new File([blob], `media_${Date.now()}_${index}`, { type: media.type });
+
+                    // Upload to Firebase Storage
+                    const path = `uploads/${Date.now()}_${file.name}`;
+                    return await uploadMedia(file, path);
+                }));
+            }
+
+            setUploadedMedia(uploadedMediaUrls);
             setLoading(false);
             setShowSuccess(true);
-        }, 2000);
+
+        } catch (error) {
+            console.error("Error uploading media:", error);
+            setLoading(false);
+            alert("Failed to upload media. Please try again.");
+        }
     };
 
     const handleCloseSuccess = () => {
-        setShowSuccess(false);
+        clearDraft(); // Clear the saved draft
         // Pass captured data back to parent
         onComplete({
-            media: mediaPreviews,
+            media: uploadedMedia,
             title: title || 'New Memory',
             description: description,
             location: location,
-            date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+            date: new Date().toISOString()
         });
     };
 
@@ -65,23 +118,23 @@ const SenderFlow = ({ onComplete, onExit }) => {
         return (
             <Box sx={{
                 position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-                bgcolor: '#1D192B',
-                color: 'white',
+                bgcolor: '#E8F5E9', // Light green
+                color: '#2E7D32', // Dark green text
                 zIndex: 9999,
                 display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', p: 4
             }}>
                 <IconButton
                     onClick={handleCloseSuccess}
-                    sx={{ position: 'absolute', top: 16, right: 16, color: 'white' }}
+                    sx={{ position: 'absolute', top: 16, right: 16, color: '#2E7D32' }}
                 >
                     <CloseIcon />
                 </IconButton>
 
-                <Typography variant="h3" sx={{ mb: 4, fontWeight: 'bold' }}>Sent!</Typography>
+                <Typography variant="h3" sx={{ mb: 4, fontWeight: 'bold' }}>Success!</Typography>
 
-                <Box sx={{ fontSize: '4rem', mb: 4 }}>🚀</Box>
+                <CheckCircleIcon sx={{ fontSize: 100, mb: 4, color: '#2E7D32' }} />
 
-                <Typography variant="h6" align="center" sx={{ mb: 2 }}>
+                <Typography variant="h6" align="center" sx={{ mb: 2, fontWeight: 'medium' }}>
                     Your message has been embedded.
                 </Typography>
                 <Typography variant="body1" align="center">

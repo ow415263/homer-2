@@ -10,19 +10,17 @@ import AllInclusiveIcon from '@mui/icons-material/AllInclusive';
 import { useLayout } from '../context/LayoutContext';
 import { motion } from 'framer-motion';
 import { sentPostcards, receivedPostcards } from '../data/mockData';
+import { createCard, getUserCards } from '../lib/db';
+import { useAuth } from '../context/AuthContext';
 
 const FALLBACK_CARD_IMAGE = 'https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?auto=format&fit=crop&w=800&q=80';
 
-const buildInitialCards = () => (
-    [...sentPostcards.map(card => ({ ...card, type: 'sent' })),
-    ...receivedPostcards.map(card => ({ ...card, type: 'received' }))]
-        .sort((a, b) => new Date(b.date) - new Date(a.date))
-);
+
 
 const Exchange = () => {
     const [viewMode, setViewMode] = useState('default'); // 'default', 'sender', 'receiver'
     const [tabValue, setTabValue] = useState(0); // 0: All, 1: Sent, 2: Received
-    const [cards, setCards] = useState(() => buildInitialCards());
+    const [cards, setCards] = useState([]);
     const { setIsFullscreen } = useLayout();
 
     const [notification, setNotification] = useState({ open: false, message: '' });
@@ -43,25 +41,81 @@ const Exchange = () => {
         setTabValue(newValue);
     };
 
-    const handleSenderComplete = (data) => {
-        const previewMedia = data.media || [];
-        const primaryMedia = previewMedia[0];
-        const newCard = {
-            id: Date.now(),
-            title: data.title || 'New Memory',
-            description: data.description,
-            date: data.date,
-            image: primaryMedia?.url || FALLBACK_CARD_IMAGE,
-            type: 'sent',
-            sender: 'You',
-            media: previewMedia,
-            location: data.location ? { name: data.location } : undefined
-        };
+    const { user } = useAuth(); // Get current user
 
-        setCards(prev => [newCard, ...prev]);
-        setHasPendingWrite(false);
-        setNotification({ open: true, message: 'Memory added to your history.' });
+    // Load cards from Firestore
+    useEffect(() => {
+        const loadCards = async () => {
+            if (user) {
+                try {
+                    const userCards = await getUserCards(user.uid);
+                    // Combine with mock received cards for now, or just use userCards
+                    // Ideally we'd have a way to fetch received cards too
+                    // For this MVP, let's just show the user's created cards + mock received
+                    const formattedUserCards = userCards.map(c => ({
+                        ...c,
+                        type: 'sent', // Assuming user created cards are 'sent'
+                        date: new Date(c.date).toLocaleDateString() // Format date for display
+                    }));
+
+                    // Merge with mock received cards (filtering out any that might duplicate IDs if we were using real IDs)
+                    const allCards = [
+                        ...formattedUserCards,
+                        ...receivedPostcards.map(card => ({ ...card, type: 'received' }))
+                    ].sort((a, b) => new Date(b.date) - new Date(a.date));
+
+                    setCards(allCards);
+                } catch (error) {
+                    console.error("Failed to load cards:", error);
+                }
+            }
+        };
+        loadCards();
+    }, [user, tabValue]); // Reload when user changes or tab changes (though tab filtering is client side)
+
+    const handleSenderComplete = async (data) => {
+        // Immediately close the SenderFlow to return to Exchange
         setViewMode('default');
+        setHasPendingWrite(false);
+
+        // Save in background
+        try {
+            const previewMedia = data.media || [];
+            const primaryMedia = previewMedia[0];
+
+            const cardData = {
+                title: data.title || 'New Memory',
+                description: data.description,
+                date: data.date,
+                image: primaryMedia?.url || FALLBACK_CARD_IMAGE,
+                media: previewMedia,
+                location: data.location ? { name: data.location } : undefined,
+                sender: 'You' // Or user.displayName
+            };
+
+            // Save to Firestore
+            if (user) {
+                await createCard(user.uid, cardData);
+
+                // Reload cards after save
+                const userCards = await getUserCards(user.uid);
+                const formattedUserCards = userCards.map(c => ({
+                    ...c,
+                    type: 'sent',
+                    date: new Date(c.date).toLocaleDateString()
+                }));
+
+                const allCards = [
+                    ...formattedUserCards,
+                    ...receivedPostcards.map(card => ({ ...card, type: 'received' }))
+                ].sort((a, b) => new Date(b.date) - new Date(a.date));
+
+                setCards(allCards);
+            }
+        } catch (error) {
+            console.error("Error creating card:", error);
+            setNotification({ open: true, message: 'Failed to save memory.' });
+        }
     };
 
     const handleSenderExit = () => {
