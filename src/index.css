@@ -1,0 +1,14 @@
+@font-face {
+  font-family: 'Adelia';
+  src: url('./assets/ADELIA.otf') format('opentype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: 'Roboto', sans-serif;
+  background-color: #FFFBFE;
+}
