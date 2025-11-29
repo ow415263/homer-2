@@ -89,13 +89,16 @@ const Exchange = () => {
                 date: data.date,
                 image: primaryMedia?.url || FALLBACK_CARD_IMAGE,
                 media: previewMedia,
-                location: data.location ? { name: data.location } : undefined,
+                location: data.location ? { name: data.location } : null,
                 sender: 'You' // Or user.displayName
             };
 
+            // Remove any undefined values from cardData
+            const cleanCardData = JSON.parse(JSON.stringify(cardData));
+
             // Save to Firestore
             if (user) {
-                await createCard(user.uid, cardData);
+                await createCard(user.uid, cleanCardData);
 
                 // Reload cards after save
                 const userCards = await getUserCards(user.uid);
@@ -114,7 +117,7 @@ const Exchange = () => {
             }
         } catch (error) {
             console.error("Error creating card:", error);
-            setNotification({ open: true, message: 'Failed to save memory.' });
+            setNotification({ open: true, message: `Failed to save memory: ${error.message}` });
         }
     };
 
