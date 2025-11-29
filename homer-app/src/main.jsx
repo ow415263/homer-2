@@ -7,6 +7,7 @@ import CssBaseline from '@mui/material/CssBaseline'
 import theme from './theme/theme'
 import { BrowserRouter } from 'react-router-dom'
 import { AuthProvider } from './context/AuthContext'
+import AuthGate from './components/AuthGate'
 import './lib/firebase'
 
 ReactDOM.createRoot(document.getElementById('root')).render(
@@ -15,7 +16,9 @@ ReactDOM.createRoot(document.getElementById('root')).render(
       <CssBaseline />
       <BrowserRouter>
         <AuthProvider>
-          <App />
+          <AuthGate>
+            <App />
+          </AuthGate>
         </AuthProvider>
       </BrowserRouter>
     </ThemeProvider>

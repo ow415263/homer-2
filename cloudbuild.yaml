@@ -1,0 +1,14 @@
+steps:
+  - name: gcr.io/k8s-skaffold/pack
+    dir: "homer-app copy"
+    args:
+      - build
+      - gcr.io/$PROJECT_ID/homer-app
+      - --builder
+      - gcr.io/buildpacks/builder:v1
+      - --env
+      - GOOGLE_RUNTIME=nodejs
+      - --publish
+
+images:
+  - gcr.io/$PROJECT_ID/homer-app
