@@ -8,6 +8,7 @@ import ViewInArIcon from '@mui/icons-material/ViewInAr';
 import CloseIcon from '@mui/icons-material/Close';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
+import homerAR from '../assets/homerar.usdz?url';
 
 const containerStyle = {
     width: '100%',
@@ -179,12 +180,15 @@ const ReceiverFlow = ({ apiKey, cardData, onExit }) => {
                     >
                         <Stack spacing={1.5}>
                             <Button
+                                component="a"
+                                href={homerAR}
+                                rel="ar"
                                 variant="contained"
                                 size="large"
                                 startIcon={<ViewInArIcon />}
                                 sx={{ borderRadius: 3 }}
                             >
-                                View in AR
+                                View Postcard in AR
                             </Button>
                             <Button
                                 variant="outlined"
@@ -365,12 +369,15 @@ const ReceiverFlow = ({ apiKey, cardData, onExit }) => {
                     }}>
                         <Stack spacing={1.5}>
                             <Button
+                                component="a"
+                                href={homerAR}
+                                rel="ar"
                                 variant="contained"
                                 startIcon={<ViewInArIcon />}
                                 fullWidth
                                 sx={{ borderRadius: 3, bgcolor: 'primary.main' }}
                             >
-                                View in AR
+                                View Postcard in AR
                             </Button>
                             <Button
                                 variant="outlined"

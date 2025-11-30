@@ -35,6 +35,7 @@ const BottomNav = () => {
         navigate(routes[newValue]);
     };
 
+    const surfaceColor = '#FFFFFF';
     return (
         <Paper
             sx={{
@@ -51,7 +52,7 @@ const BottomNav = () => {
                 overflow: 'hidden',
                 minWidth: { md: navWidth },
                 maxWidth: { xs: 'none', md: navWidth },
-                backgroundColor: 'rgba(255,255,255,0.92)',
+                backgroundColor: surfaceColor,
                 backdropFilter: 'blur(22px) saturate(160%)',
                 WebkitBackdropFilter: 'blur(22px) saturate(160%)',
                 border: '1px solid rgba(15, 23, 42, 0.15)',
@@ -81,7 +82,7 @@ const BottomNav = () => {
                             width: '100%',
                             height: '100%',
                             borderRadius: 4,
-                            backgroundColor: 'rgba(255,255,255,0.92)',
+                            backgroundColor: '#FFFFFF',
                             boxShadow: '0 6px 16px rgba(15, 23, 42, 0.12)',
                             border: '1px solid rgba(255,255,255,0.65)'
                         }}

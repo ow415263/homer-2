@@ -7,6 +7,8 @@ import Exchange from './pages/Exchange';
 import Profile from './pages/Profile';
 import Cards from './pages/Cards';
 import Login from './pages/Login';
+import SharedMemory from './pages/SharedMemory';
+import ReceiverDemo from './pages/ReceiverDemo';
 import Header from './components/Header';
 import ChatButton from './components/ChatButton';
 import { LayoutProvider, useLayout } from './context/LayoutContext';
@@ -36,6 +38,8 @@ const AppContent = () => {
         <Route path="/cards" element={<Cards />} />
         <Route path="/exchange" element={<Exchange />} />
         <Route path="/profile" element={<Profile />} />
+        <Route path="/memory/:token" element={<SharedMemory />} />
+        <Route path="/receiver-demo" element={<ReceiverDemo />} />
       </Routes>
     </Box>
   );

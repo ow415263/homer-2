@@ -6,6 +6,7 @@ import OpenAI from 'openai';
 import homerLogo from '../assets/Homer_Logo.svg';
 
 const ChatInterface = ({ onClose }) => {
+    const surfaceColor = '#FFFFFF';
     const [messages, setMessages] = useState([
         {
             role: 'assistant',
@@ -106,7 +107,7 @@ const ChatInterface = ({ onClose }) => {
                 right: 0,
                 bottom: 0,
                 zIndex: 2000,
-                bgcolor: 'background.default',
+                bgcolor: surfaceColor,
                 display: 'flex',
                 flexDirection: 'column'
             }}
@@ -118,8 +119,8 @@ const ChatInterface = ({ onClose }) => {
                     borderBottom: '1px solid',
                     borderColor: 'divider',
                     position: 'relative',
-                    bgcolor: 'primary.main',
-                    color: 'white',
+                    bgcolor: surfaceColor,
+                    color: 'text.primary',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between'
@@ -130,7 +131,7 @@ const ChatInterface = ({ onClose }) => {
                         component="img"
                         src={homerLogo}
                         alt="Homer logo"
-                        sx={{ width: 64, height: 64, filter: 'brightness(0) invert(1)' }}
+                        sx={{ width: 64, height: 64 }}
                     />
                     <Box>
                         <Typography
@@ -138,18 +139,17 @@ const ChatInterface = ({ onClose }) => {
                             sx={{
                                 fontFamily: 'Adelia, cursive',
                                 lineHeight: 1,
-                                color: 'white',
                                 fontSize: 14
                             }}
                         >
                             Homer
                         </Typography>
-                        <Typography variant="caption" sx={{ color: 'white' }}>
+                        <Typography variant="caption" sx={{ color: 'text.secondary' }}>
                             Assistant · Powered by AI
                         </Typography>
                     </Box>
                 </Box>
-                <IconButton onClick={onClose} sx={{ color: 'white' }}>
+                <IconButton onClick={onClose} sx={{ color: 'text.primary' }}>
                     <CloseIcon />
                 </IconButton>
             </Box>
@@ -162,7 +162,8 @@ const ChatInterface = ({ onClose }) => {
                     p: 2,
                     display: 'flex',
                     flexDirection: 'column',
-                    gap: 2
+                    gap: 2,
+                    bgcolor: surfaceColor
                 }}
             >
                 {messages.map((message, index) => (
@@ -179,7 +180,7 @@ const ChatInterface = ({ onClose }) => {
                                 p: 2,
                                 maxWidth: '75%',
                                 borderRadius: 3,
-                                bgcolor: message.role === 'user' ? 'primary.main' : 'grey.100',
+                                bgcolor: message.role === 'user' ? 'primary.main' : 'white',
                                 color: message.role === 'user' ? 'white' : 'text.primary'
                             }}
                         >
@@ -191,7 +192,7 @@ const ChatInterface = ({ onClose }) => {
                 ))}
                 {isLoading && (
                     <Box sx={{ display: 'flex', justifyContent: 'flex-start' }}>
-                        <Paper elevation={1} sx={{ p: 2, borderRadius: 3, bgcolor: 'grey.100' }}>
+                        <Paper elevation={1} sx={{ p: 2, borderRadius: 3, bgcolor: 'white' }}>
                             <CircularProgress size={20} />
                         </Paper>
                     </Box>
@@ -205,7 +206,7 @@ const ChatInterface = ({ onClose }) => {
                     p: 2,
                     borderTop: '1px solid',
                     borderColor: 'divider',
-                    bgcolor: 'background.paper'
+                    bgcolor: surfaceColor
                 }}
             >
                 <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'flex-end' }}>

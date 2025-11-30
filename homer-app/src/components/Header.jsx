@@ -3,7 +3,6 @@ import { Box, Typography, IconButton, Button, Avatar } from '@mui/material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import PersonIcon from '@mui/icons-material/Person';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import AutoFixHighIcon from '@mui/icons-material/AutoFixHigh';
 import NfcIcon from '@mui/icons-material/Nfc';
 import { useAuth } from '../context/AuthContext';
 
@@ -11,7 +10,6 @@ const Header = () => {
     const navigate = useNavigate();
     const location = useLocation();
     const isProfilePage = location.pathname === '/profile';
-    const isCardsPage = location.pathname === '/cards';
     const { user, profile } = useAuth();
     const avatarSrc = profile?.photoURL || user?.photoURL || null;
     const avatarAlt = profile?.displayName || user?.displayName || 'Profile';
@@ -20,21 +18,16 @@ const Header = () => {
         navigate(-1); // Go back to previous page
     };
 
-    const handleCreateCard = () => {
-        // TODO: Open create card flow/dialog
-        console.log('Create custom card clicked');
-    };
-
     const handleTapCard = () => {
         if (user) {
-            navigate('/exchange', { state: { startTapCardFlow: true } });
+            navigate('/exchange', { state: { resumeAction: 'sender' } });
             return;
         }
 
         navigate('/login', {
             state: {
                 from: '/exchange',
-                resumeAction: 'tap-card'
+                resumeAction: 'sender'
             }
         });
     };
@@ -47,8 +40,8 @@ const Header = () => {
                 left: 0,
                 right: 0,
                 height: 64,
-                bgcolor: 'primary.main',
-                color: 'white',
+            bgcolor: 'primary.main',
+            color: 'white',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: isProfilePage ? 'flex-start' : 'space-between',
@@ -86,27 +79,6 @@ const Header = () => {
                     </Typography>
 
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                        {isCardsPage && (
-                            <Button
-                                variant="outlined"
-                                onClick={handleCreateCard}
-                                startIcon={<AutoFixHighIcon />}
-                                sx={{
-                                    color: 'white',
-                                    borderColor: 'white',
-                                    textTransform: 'none',
-                                    fontWeight: 'bold',
-                                    borderWidth: 2,
-                                    '&:hover': {
-                                        borderWidth: 2,
-                                        borderColor: 'white',
-                                        bgcolor: 'rgba(255, 255, 255, 0.1)'
-                                    }
-                                }}
-                            >
-                                Custom
-                            </Button>
-                        )}
                         <Button
                             variant="contained"
                             color="secondary"

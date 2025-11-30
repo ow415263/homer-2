@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
     Box,
     Typography,
@@ -11,10 +11,7 @@ import {
     Tab,
     CircularProgress,
     Stack,
-    IconButton,
-    Dialog,
-    DialogContent,
-    DialogTitle
+    IconButton
 } from '@mui/material';
 import GoogleIcon from '@mui/icons-material/Google';
 import AppleIcon from '@mui/icons-material/Apple';
@@ -25,7 +22,6 @@ import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import SenderFlow from '../components/SenderFlow';
 import ReceiverFlow from '../components/ReceiverFlow';
 import CreateIcon from '@mui/icons-material/Create';
-import NfcIcon from '@mui/icons-material/Nfc';
 import SendIcon from '@mui/icons-material/Send';
 import CallReceivedIcon from '@mui/icons-material/CallReceived';
 import AllInclusiveIcon from '@mui/icons-material/AllInclusive';
@@ -34,7 +30,12 @@ import { sentPostcards, receivedPostcards } from '../data/mockData';
 import { gsap } from 'gsap';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { addUserCard, subscribeToUserCards } from '../lib/cardsRepository';
+import {
+    addUserCard,
+    subscribeToUserCards,
+    updateCardShareMetadata,
+    saveCardShareMapping
+} from '../lib/cardsRepository';
 import { GOOGLE_MAPS_API_KEY } from '../lib/maps';
 
 const FALLBACK_CARD_IMAGE = 'https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?auto=format&fit=crop&w=800&q=80';
@@ -88,7 +89,7 @@ const Exchange = () => {
     const { setIsFullscreen } = useLayout();
     const navigate = useNavigate();
     const location = useLocation();
-    const { user, signIn, signInWithApple } = useAuth();
+    const { user, loading: authLoading, signIn, signInWithApple } = useAuth();
     const resumeAction = location.state?.resumeAction;
 
     const [notification, setNotification] = useState({ open: false, message: '', severity: 'info' });
@@ -101,7 +102,59 @@ const Exchange = () => {
     const indicatorBarRef = useRef(null);
     const [authPromptAction, setAuthPromptAction] = useState(null);
     const [authProcessing, setAuthProcessing] = useState(false);
-    const [tapCardPromptOpen, setTapCardPromptOpen] = useState(false);
+    const [pendingTapAction, setPendingTapAction] = useState(null);
+
+    const generateShareToken = () => {
+        if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+            return crypto.randomUUID();
+        }
+        return `share-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+    };
+
+    const buildShareUrl = (token) => {
+        const origin = typeof window !== 'undefined' && window.location?.origin
+            ? window.location.origin
+            : 'https://homer.cards';
+        return `${origin}/memory/${token}`;
+    };
+
+    const sanitizeCardForShare = (card) => {
+        if (!card) return null;
+        return {
+            title: card.title || 'Shared Memory',
+            description: card.description || '',
+            date: card.date || new Date().toLocaleDateString(),
+            image: card.image || FALLBACK_CARD_IMAGE,
+            media: Array.isArray(card.media) ? card.media : [],
+            location: card.location || null,
+            type: card.type || 'sent',
+            sender: card.sender || 'Friend',
+        };
+    };
+
+    const ensureShareMappingForCard = async (cardId, cardSnapshot) => {
+        if (!user || !cardSnapshot) return null;
+        const token = generateShareToken();
+        const shareUrl = buildShareUrl(token);
+        const sanitized = sanitizeCardForShare(cardSnapshot);
+
+        await Promise.all([
+            updateCardShareMetadata(user.uid, cardId, {
+                shareToken: token,
+                shareUrl
+            }),
+            saveCardShareMapping({
+                token,
+                ownerId: user.uid,
+                cardId,
+                shareUrl,
+                cardSnapshot: sanitized
+            })
+        ]);
+
+        return shareUrl;
+    };
+
 
     // Reset fullscreen when unmounting or switching to default
     useEffect(() => {
@@ -179,7 +232,9 @@ const Exchange = () => {
             });
             setCards(prev => prev.map(card => card.id === tempId ? { ...card, id: docId } : card));
             setPendingCardId(docId);
+            await ensureShareMappingForCard(docId, { ...cardPayload, id: docId });
             setNotification({ open: true, message: 'Memory embedded! Ready to be mailed.', severity: 'success' });
+            navigate('/exchange', { replace: true });
         } catch (error) {
             console.error('Failed to save card', error);
             setCards(prev => prev.filter(card => card.id !== tempId));
@@ -217,15 +272,6 @@ const Exchange = () => {
         setAuthPromptAction(action);
     };
 
-    const handleTapCardChoice = (action) => {
-        setTapCardPromptOpen(false);
-        requestAction(action);
-    };
-
-    const closeTapCardPrompt = () => {
-        setTapCardPromptOpen(false);
-    };
-
     const closeAuthPrompt = () => {
         if (authProcessing) return;
         setAuthPromptAction(null);
@@ -239,7 +285,9 @@ const Exchange = () => {
         if (authPromptAction === 'sender') {
             setViewMode('sender');
         } else if (authPromptAction === 'receiver') {
-            setViewMode('receiver');
+            if (selectedCard) {
+                setViewMode('receiver');
+            }
         }
         setAuthPromptAction(null);
     };
@@ -279,6 +327,7 @@ const Exchange = () => {
         setNotification({ ...notification, open: false });
     };
 
+
     useEffect(() => {
         if (!showNewCardIndicator || !indicatorBarRef.current) return;
 
@@ -306,33 +355,50 @@ const Exchange = () => {
     }, [showNewCardIndicator, cards, pendingCardId]);
 
     useEffect(() => {
-        if (!user || !resumeAction) return;
-        if (resumeAction === 'sender') {
-            setViewMode('sender');
-        } else if (resumeAction === 'receiver') {
-            setViewMode('receiver');
-        } else if (resumeAction === 'tap-card') {
-            setTapCardPromptOpen(true);
-        }
+        if (!resumeAction) return;
+        setPendingTapAction(resumeAction);
         navigate(location.pathname, { replace: true });
-    }, [user, resumeAction, navigate, location.pathname]);
-
-    const startTapCardFlow = location.state?.startTapCardFlow;
+    }, [resumeAction, navigate, location.pathname]);
 
     useEffect(() => {
-        if (!startTapCardFlow) return;
-        if (user) {
-            setTapCardPromptOpen(true);
-            navigate(location.pathname, { replace: true });
-        } else {
-            navigate('/login', {
-                state: {
-                    from: '/exchange',
-                    resumeAction: 'tap-card'
-                }
-            });
+        if (!pendingTapAction) return;
+        if (authLoading) return;
+
+        if (!user) {
+            setAuthPromptAction(pendingTapAction);
+            setPendingTapAction(null);
+            return;
         }
-    }, [startTapCardFlow, user, navigate, location.pathname]);
+
+        if (pendingTapAction === 'sender') {
+            setViewMode('sender');
+            setPendingTapAction(null);
+        } else if (pendingTapAction === 'receiver') {
+            if (selectedCard) {
+                setViewMode('receiver');
+                setPendingTapAction(null);
+            } else {
+                setNotification({ open: true, message: 'Select a memory to read first.', severity: 'info' });
+                setPendingTapAction(null);
+            }
+        }
+    }, [pendingTapAction, authLoading, user, selectedCard]);
+
+    const tapCardQuery = useMemo(() => {
+        const params = new URLSearchParams(location.search);
+        return params.get('tap-card') || params.get('tap') || null;
+    }, [location.search]);
+
+    useEffect(() => {
+        if (!tapCardQuery) return;
+        const normalized = tapCardQuery.toLowerCase();
+        if (['embed', 'write', 'sender'].includes(normalized)) {
+            setPendingTapAction('sender');
+        } else if (['read', 'receiver'].includes(normalized)) {
+            setPendingTapAction('receiver');
+        }
+        navigate(location.pathname, { replace: true });
+    }, [tapCardQuery, navigate, location.pathname]);
 
     // Filter cards based on tab
     const displayCards = tabValue === 0 ? cards :
@@ -515,7 +581,8 @@ const Exchange = () => {
                         position: 'fixed',
                         inset: 0,
                         zIndex: (theme) => theme.zIndex.modal + 1,
-                        display: 'flex'
+                        display: 'flex',
+                        backgroundColor: 'rgba(0,0,0,1)'
                     }}
                 >
                     <Paper
@@ -611,64 +678,6 @@ const Exchange = () => {
             )}
         </Box>
 
-        <Dialog
-            open={tapCardPromptOpen}
-            onClose={closeTapCardPrompt}
-            fullScreen
-            PaperProps={{
-                sx: {
-                    bgcolor: 'rgba(0,0,0,0.7)',
-                    borderRadius: 0
-                }
-            }}
-        >
-            <DialogContent
-                sx={{
-                    bgcolor: 'background.paper',
-                    borderRadius: 0,
-                    p: { xs: 4, md: 6 },
-                    width: '100%',
-                    height: '100%',
-                    textAlign: 'center',
-                    boxShadow: 'none',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    justifyContent: 'center'
-                }}
-            >
-                <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
-                    <IconButton onClick={closeTapCardPrompt}>
-                        <CloseIcon />
-                    </IconButton>
-                </Box>
-                <DialogTitle sx={{ textAlign: 'center', fontSize: 28, fontWeight: 'bold', pb: 1 }}>
-                    Tap Card
-                </DialogTitle>
-                <Typography variant="body1" color="text.secondary" sx={{ mb: 4 }}>
-                    Choose what you’d like to do with your Homer card.
-                </Typography>
-                <Stack spacing={2}>
-                    <Button
-                        variant="contained"
-                        size="large"
-                        startIcon={<CreateIcon />}
-                        onClick={() => handleTapCardChoice('sender')}
-                        sx={{ borderRadius: 3, py: 1.5 }}
-                    >
-                        Embed a Memory
-                    </Button>
-                    <Button
-                        variant="outlined"
-                        size="large"
-                        startIcon={<NfcIcon />}
-                        onClick={() => handleTapCardChoice('receiver')}
-                        sx={{ borderRadius: 3, py: 1.5, borderWidth: 2 }}
-                    >
-                        Read a Memory
-                    </Button>
-                </Stack>
-            </DialogContent>
-        </Dialog>
         </>
     );
 };

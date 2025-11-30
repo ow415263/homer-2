@@ -8,6 +8,7 @@ import ViewInArIcon from '@mui/icons-material/ViewInAr';
 import CloseIcon from '@mui/icons-material/Close';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
+import homerAR from '../assets/homerar.usdz?url';
 
 const containerStyle = {
     width: '100%',
@@ -118,36 +119,54 @@ const ReceiverFlow = ({ apiKey, cardData, onExit }) => {
                 py: 2,
                 pt: 3
             }}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-                    <Typography variant="h5" sx={{ fontWeight: 'bold' }}>{title}</Typography>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                        {locationLabel && (
-                            <Typography
-                                variant="body2"
-                                color="text.secondary"
-                                sx={{
-                                    maxWidth: 160,
-                                    whiteSpace: 'nowrap',
-                                    overflow: 'hidden',
-                                    textOverflow: 'ellipsis',
-                                    fontWeight: 500
-                                }}
+                <Box
+                    sx={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 1,
+                        mb: 1
+                    }}
+                >
+                    <Box
+                        sx={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            gap: 1,
+                            flexWrap: 'wrap'
+                        }}
+                    >
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flex: '1 1 auto', minWidth: 0 }}>
+                            {locationLabel && (
+                                <Typography
+                                    variant="body2"
+                                    color="text.secondary"
+                                    sx={{
+                                        flex: 1,
+                                        minWidth: 0,
+                                        whiteSpace: 'nowrap',
+                                        overflow: 'hidden',
+                                        textOverflow: 'ellipsis',
+                                        fontWeight: 600
+                                    }}
+                                >
+                                    {locationLabel}
+                                </Typography>
+                            )}
+                            <IconButton
+                                onClick={handleToggleMap}
+                                color="primary"
+                                sx={{ ml: { xs: 0, sm: 1 } }}
+                                title={hasValidCoordinates ? 'Show map preview' : 'Map preview will show a placeholder until location is set'}
                             >
-                                {locationLabel}
-                            </Typography>
-                        )}
-                        <IconButton
-                            onClick={handleToggleMap}
-                            color="primary"
-                            sx={{ mr: 1 }}
-                            title={hasValidCoordinates ? 'Show map preview' : 'Map preview will show a placeholder until location is set'}
-                        >
-                            {showMap ? <ViewCarouselIcon /> : <MapIcon />}
-                        </IconButton>
+                                {showMap ? <ViewCarouselIcon /> : <MapIcon />}
+                            </IconButton>
+                        </Box>
                         <IconButton onClick={onExit} color="default">
                             <CloseIcon />
                         </IconButton>
                     </Box>
+                    <Typography variant="h5" sx={{ fontWeight: 'bold' }}>{title}</Typography>
                 </Box>
                 <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
                     {description}
@@ -179,12 +198,15 @@ const ReceiverFlow = ({ apiKey, cardData, onExit }) => {
                     >
                         <Stack spacing={1.5}>
                             <Button
+                                component="a"
+                                href={homerAR}
+                                rel="ar"
                                 variant="contained"
                                 size="large"
                                 startIcon={<ViewInArIcon />}
                                 sx={{ borderRadius: 3 }}
                             >
-                                View in AR
+                                View Postcard in AR
                             </Button>
                             <Button
                                 variant="outlined"
@@ -365,12 +387,15 @@ const ReceiverFlow = ({ apiKey, cardData, onExit }) => {
                     }}>
                         <Stack spacing={1.5}>
                             <Button
+                                component="a"
+                                href={homerAR}
+                                rel="ar"
                                 variant="contained"
                                 startIcon={<ViewInArIcon />}
                                 fullWidth
                                 sx={{ borderRadius: 3, bgcolor: 'primary.main' }}
                             >
-                                View in AR
+                                View Postcard in AR
                             </Button>
                             <Button
                                 variant="outlined"

@@ -16,6 +16,7 @@ import {
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import { phygitalCards, eCardThemes } from '../data/mockData';
+import { keyframes } from '@emotion/react';
 
 const Cards = () => {
     const [tabValue, setTabValue] = useState(0);
@@ -168,6 +169,71 @@ const Cards = () => {
         return eCardThemesData.filter(card => card.category === selectedCategory);
     };
 
+    const gradientShift = keyframes`
+        0% { background-position: 0% 50%; }
+        50% { background-position: 100% 50%; }
+        100% { background-position: 0% 50%; }
+    `;
+
+    const CustomDesignCTA = ({ variant }) => (
+        <Box
+            sx={{
+                height: 200,
+                width: '100%',
+                borderRadius: 4,
+                mb: 4,
+                position: 'relative',
+                overflow: 'hidden',
+                background: 'linear-gradient(120deg, #0088FF, #00C6FF, #0088FF)',
+                backgroundSize: '200% 200%',
+                animation: `${gradientShift} 8s ease-in-out infinite`,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#fff'
+            }}
+        >
+            <Box
+                sx={{
+                    position: 'relative',
+                    zIndex: 1,
+                    textAlign: 'center',
+                    px: 3,
+                    width: '100%'
+                }}
+            >
+                <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 600 }}>
+                    {variant === 'phygital' ? 'Design your own Phygital keepsake' : 'Craft a bespoke E-Card experience'}
+                </Typography>
+                <Button
+                    variant="contained"
+                    sx={{
+                        borderRadius: '999px',
+                        px: 4,
+                        bgcolor: 'white',
+                        color: 'primary.main',
+                        boxShadow: '0 8px 18px rgba(0,0,0,0.18)',
+                        fontWeight: 600,
+                        '&:hover': {
+                            bgcolor: 'rgba(255,255,255,0.9)'
+                        }
+                    }}
+                >
+                    Create Your Own
+                </Button>
+            </Box>
+            <Box
+                component="span"
+                sx={{
+                    position: 'absolute',
+                    inset: 0,
+                    background: 'radial-gradient(circle at 20% 20%, rgba(255,255,255,0.25), transparent 45%), radial-gradient(circle at 80% 30%, rgba(255,255,255,0.2), transparent 50%), radial-gradient(circle at 30% 80%, rgba(255,255,255,0.15), transparent 40%)',
+                    opacity: 0.9
+                }}
+            />
+        </Box>
+    );
+
     const CardSection = ({ title, cards, variant = 'phygital' }) => (
         <Box sx={{ mb: 4 }}>
             <Typography variant="h6" sx={{ mb: 2, fontWeight: 'bold' }}>{title}</Typography>
@@ -257,6 +323,9 @@ const Cards = () => {
                     );
                 })}
             </Box>
+
+            {/* Custom CTA */}
+            <CustomDesignCTA variant={tabValue === 0 ? 'phygital' : 'digital'} />
 
             {/* Phygital Cards Section */}
             <Box role="tabpanel" hidden={tabValue !== 0}>

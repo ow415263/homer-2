@@ -1,149 +1,60 @@
-import React, { useEffect, useState } from 'react';
-import { Box, Button, Typography, Paper, Container, TextField, Divider, Stack, Alert } from '@mui/material';
-import GoogleIcon from '@mui/icons-material/Google';
-import AppleIcon from '@mui/icons-material/Apple';
-import PhoneIcon from '@mui/icons-material/Phone';
-import EmailIcon from '@mui/icons-material/Email';
+import React, { useEffect, useState, useCallback } from 'react';
+import { Box, Button, Typography, Paper, Container, TextField, Stack, Alert } from '@mui/material';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { RecaptchaVerifier } from 'firebase/auth';
+import { getRedirectResult } from 'firebase/auth';
 import { auth } from '../lib/firebaseAuth';
 
 const Login = () => {
-    const { signIn, signInWithApple, signInWithEmail, signUpWithEmail, signInWithPhone } = useAuth();
+    const LOGIN_RETURN_PATH_KEY = 'homer:returnPath';
+    const LOGIN_RESUME_ACTION_KEY = 'homer:resumeAction';
+
+    const {
+        user,
+        loading: authLoading,
+        signInWithEmail,
+        signUpWithEmail
+    } = useAuth();
     const navigate = useNavigate();
-    const location = useLocation();
-    const locationState = location.state || {};
-    const fromPath = locationState.from || '/';
-    const resumeAction = locationState.resumeAction;
-    const requestedMethod = locationState.method;
-    const [error, setError] = useState('');
-    const [mode, setMode] = useState('select'); // select, email, phone
-    const [isSignUp, setIsSignUp] = useState(false);
-
-    // Email State
-    const [email, setEmail] = useState('');
-    const [password, setPassword] = useState('');
-
-    // Phone State
-    const [phoneNumber, setPhoneNumber] = useState('');
-    const [verificationCode, setVerificationCode] = useState('');
-    const [confirmationResult, setConfirmationResult] = useState(null);
-
-    useEffect(() => {
-        if (!requestedMethod) return;
-        if (requestedMethod === 'email') {
-            setMode('email');
-        } else if (requestedMethod === 'sms' || requestedMethod === 'phone') {
-            setMode('phone');
-        }
-    }, [requestedMethod]);
-
-    const navigateAfterAuth = () => {
-        if (resumeAction) {
-            navigate(fromPath, { state: { resumeAction } });
-        } else {
-            navigate(fromPath);
-        }
-    };
-
-    const handleGoogleSignIn = async () => {
-        try {
-            setError('');
-            await signIn();
-            navigateAfterAuth();
-        } catch (error) {
-            console.error('Error signing in with Google:', error);
-            setError(error.message || 'Failed to sign in');
-        }
-    };
-
-    const handleAppleSignIn = async () => {
-        try {
-            setError('');
-            await signInWithApple();
-            navigateAfterAuth();
-        } catch (error) {
-            console.error('Error signing in with Apple:', error);
-            setError(error.message || 'Failed to sign in');
-        }
-    };
-
-    const handleEmailAuth = async (e) => {
-        e.preventDefault();
-        try {
-            setError('');
-            if (isSignUp) {
-                await signUpWithEmail(email, password);
-            } else {
-                await signInWithEmail(email, password);
-            }
-            navigateAfterAuth();
-        } catch (error) {
-            console.error('Error with email auth:', error);
-            setError(error.message || 'Failed to authenticate');
-        }
-    };
-
-    const setupRecaptcha = () => {
-        if (!window.recaptchaVerifier) {
-            window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
-                'size': 'normal',
-                'callback': (response) => {
-                    // reCAPTCHA solved, allow signInWithPhoneNumber.
-                },
-                'expired-callback': () => {
-                    // Response expired. Ask user to solve reCAPTCHA again.
-                }
-            });
-        }
-    };
-
-    const handleSendCode = async (e) => {
-        e.preventDefault();
-        try {
-            setError('');
-            setupRecaptcha();
-            const appVerifier = window.recaptchaVerifier;
-            const result = await signInWithPhone(phoneNumber, appVerifier);
-            setConfirmationResult(result);
-        } catch (error) {
-            console.error('Error sending code:', error);
-            setError(error.message || 'Failed to send code');
-        }
-    };
-
-    const handleVerifyCode = async (e) => {
-        e.preventDefault();
-        try {
-            setError('');
-            await confirmationResult.confirm(verificationCode);
-            navigateAfterAuth();
-        } catch (error) {
-            console.error('Error verifying code:', error);
-            setError(error.message || 'Invalid code');
-        }
-    };
-
-    const renderSelectMode = () => (
-        <Stack spacing={2} width="100%">
-            <Button
-                variant="outlined"
-                size="large"
-                startIcon={<GoogleIcon />}
-                onClick={handleGoogleSignIn}
+    const renderEmailForm = () => (
+        <Box component="form" onSubmit={handleEmailAuth} width="100%">
+            <TextField
+                label="Email"
+                type="email"
                 fullWidth
-                sx={{ borderRadius: 50, borderColor: '#ddd', color: 'text.primary' }}
+                margin="normal"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+            />
+            <TextField
+                label="Password"
+                type="password"
+                fullWidth
+                margin="normal"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+            />
+            <Button
+                type="submit"
+                variant="contained"
+                fullWidth
+                size="large"
+                sx={{ mt: 2, borderRadius: 50 }}
             >
-                Sign in with Google
+                {isSignUp ? 'Create account' : 'Sign in'}
             </Button>
             <Button
-                variant="outlined"
-                size="large"
-                startIcon={<AppleIcon />}
-                onClick={handleAppleSignIn}
+                variant="text"
                 fullWidth
-                sx={{ borderRadius: 50, borderColor: '#ddd', color: 'text.primary' }}
+                onClick={() => setIsSignUp(!isSignUp)}
+                sx={{ mt: 1 }}
+            >
+                {isSignUp ? 'Have an account? Sign in' : 'New to Homer? Create an account'}
+            </Button>
+        </Box>
+    );
             >
                 Sign in with Apple
             </Button>
@@ -312,7 +223,7 @@ const Login = () => {
                     </Typography>
 
                     <Typography variant="h5" sx={{ mb: 4, fontWeight: 'medium' }}>
-                        {mode === 'select' ? 'Welcome Back' : mode === 'email' ? (isSignUp ? 'Create Account' : 'Sign In') : 'Phone Sign In'}
+                        {isSignUp ? 'Create Account' : 'Sign In'}
                     </Typography>
 
                     {error && (
@@ -321,9 +232,7 @@ const Login = () => {
                         </Alert>
                     )}
 
-                    {mode === 'select' && renderSelectMode()}
-                    {mode === 'email' && renderEmailMode()}
-                    {mode === 'phone' && renderPhoneMode()}
+                    {renderEmailForm()}
                 </Paper>
             </Box>
         </Container>
