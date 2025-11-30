@@ -1,16 +1,14 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Box, TextField, Button, Typography, Switch, FormControlLabel, CircularProgress, IconButton, Grid } from '@mui/material';
+import { Box, TextField, Button, Typography, Switch, FormControlLabel, CircularProgress, IconButton } from '@mui/material';
 import AddPhotoAlternateIcon from '@mui/icons-material/AddPhotoAlternate';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
 import CloseIcon from '@mui/icons-material/Close';
 import DeleteIcon from '@mui/icons-material/Delete';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import gsap from 'gsap';
 import { uploadMedia } from '../lib/db';
+import { geocodeLocation } from '../lib/maps';
 
 const SenderFlow = ({ onComplete, onExit }) => {
     const [loading, setLoading] = useState(false);
-    const [showSuccess, setShowSuccess] = useState(false);
     const [mediaPreviews, setMediaPreviews] = useState([]);
     const fileInputRef = useRef(null);
     const containerRef = useRef(null);
@@ -18,7 +16,8 @@ const SenderFlow = ({ onComplete, onExit }) => {
     const [title, setTitle] = useState('');
     const [description, setDescription] = useState('');
     const [location, setLocation] = useState('');
-    const [uploadedMedia, setUploadedMedia] = useState([]);
+    const [geoTaggingEnabled, setGeoTaggingEnabled] = useState(true);
+    const [geoWarning, setGeoWarning] = useState(null);
 
     // Load draft from localStorage on mount
     useEffect(() => {
@@ -74,75 +73,52 @@ const SenderFlow = ({ onComplete, onExit }) => {
 
     const handleSubmit = async () => {
         setLoading(true);
+        setGeoWarning(null);
         try {
             let uploadedMediaUrls = [];
 
-            // Only upload if there are media files
             if (mediaPreviews.length > 0) {
                 uploadedMediaUrls = await Promise.all(mediaPreviews.map(async (media, index) => {
-                    // Convert data URL to Blob
                     const response = await fetch(media.url);
                     const blob = await response.blob();
                     const file = new File([blob], `media_${Date.now()}_${index}`, { type: media.type });
-
-                    // Upload to Firebase Storage
                     const path = `uploads/${Date.now()}_${file.name}`;
-                    return await uploadMedia(file, path);
+                    return uploadMedia(file, path);
                 }));
             }
 
-            setUploadedMedia(uploadedMediaUrls);
-            setLoading(false);
-            setShowSuccess(true);
+            const trimmedLocation = location.trim();
+            let resolvedLocation = trimmedLocation ? { name: trimmedLocation } : undefined;
 
+            if (trimmedLocation && geoTaggingEnabled) {
+                try {
+                    const geocoded = await geocodeLocation(trimmedLocation);
+                    if (geocoded) {
+                        resolvedLocation = geocoded;
+                    } else {
+                        setGeoWarning('Google Maps key missing, saving text location only.');
+                    }
+                } catch (error) {
+                    console.warn('Failed to geocode location', error);
+                    setGeoWarning('Could not fetch map coordinates. Memory will still save.');
+                }
+            }
+
+            clearDraft();
+            onComplete({
+                media: uploadedMediaUrls,
+                title: title || 'New Memory',
+                description,
+                location: resolvedLocation,
+                date: new Date().toISOString()
+            });
         } catch (error) {
-            console.error("Error uploading media:", error);
+            console.error('Error uploading media:', error);
+            alert('Failed to upload media. Please try again.');
+        } finally {
             setLoading(false);
-            alert("Failed to upload media. Please try again.");
         }
     };
-
-    const handleCloseSuccess = () => {
-        clearDraft(); // Clear the saved draft
-        // Pass captured data back to parent
-        onComplete({
-            media: uploadedMedia,
-            title: title || 'New Memory',
-            description: description,
-            location: location,
-            date: new Date().toISOString()
-        });
-    };
-
-    if (showSuccess) {
-        return (
-            <Box sx={{
-                position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-                bgcolor: '#E8F5E9', // Light green
-                color: '#2E7D32', // Dark green text
-                zIndex: 9999,
-                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', p: 4
-            }}>
-                <IconButton
-                    onClick={handleCloseSuccess}
-                    sx={{ position: 'absolute', top: 16, right: 16, color: '#2E7D32' }}
-                >
-                    <CloseIcon />
-                </IconButton>
-
-                <Typography variant="h3" sx={{ mb: 4, fontWeight: 'bold' }}>Success!</Typography>
-
-                <CheckCircleIcon sx={{ fontSize: 100, mb: 4, color: '#2E7D32' }} />
-
-                <Typography variant="h6" align="center" sx={{ mb: 2, fontWeight: 'medium' }}>
-                    Your message has been embedded.
-                </Typography>
-                <Typography variant="body1" align="center">
-                    Now drop your postcard in the mail!
-                </Typography>
-            </Box>
-        );
-    }
 
     return (
         <Box ref={containerRef} sx={{
@@ -184,6 +160,21 @@ const SenderFlow = ({ onComplete, onExit }) => {
                     endAdornment: <LocationOnIcon color="action" />
                 }}
             />
+            <FormControlLabel
+                control={
+                    <Switch
+                        checked={geoTaggingEnabled}
+                        onChange={(_, checked) => setGeoTaggingEnabled(checked)}
+                    />
+                }
+                label="Enable Geo-tagging"
+                sx={{ mb: geoWarning ? 0 : 2 }}
+            />
+            {geoWarning && (
+                <Typography variant="caption" color="text.secondary" sx={{ mb: 2 }}>
+                    {geoWarning}
+                </Typography>
+            )}
             <TextField
                 label="Description"
                 fullWidth
@@ -303,12 +294,6 @@ const SenderFlow = ({ onComplete, onExit }) => {
                     {mediaPreviews.length > 0 ? 'Add More Photos/Videos' : 'Add Photos/Videos'}
                 </Typography>
             </Box>
-
-            <FormControlLabel
-                control={<Switch defaultChecked />}
-                label="Enable Geo-tagging"
-                sx={{ mb: 4 }}
-            />
 
             <Button
                 variant="contained"

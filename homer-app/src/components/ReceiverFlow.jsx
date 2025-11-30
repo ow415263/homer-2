@@ -1,5 +1,5 @@
-import React, { useState, useRef } from 'react';
-import { Box, Typography, Button, IconButton, Paper, Grid } from '@mui/material';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
+import { Box, Typography, Button, IconButton, Paper, Stack } from '@mui/material';
 import { GoogleMap, LoadScript, Marker } from '@react-google-maps/api';
 import MapIcon from '@mui/icons-material/Map';
 import ViewCarouselIcon from '@mui/icons-material/ViewCarousel';
@@ -8,7 +8,6 @@ import ViewInArIcon from '@mui/icons-material/ViewInAr';
 import CloseIcon from '@mui/icons-material/Close';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
-import { motion } from 'framer-motion';
 
 const containerStyle = {
     width: '100%',
@@ -20,7 +19,19 @@ const center = {
     lng: 2.3522 // Paris
 };
 
-const ReceiverFlow = ({ apiKey, cardData, onExit, layoutId }) => {
+const formatLocationLabel = (location) => {
+    if (!location) return null;
+    if (typeof location === 'string') return location;
+    if (location.name) return location.name;
+    const parts = [location.city, location.state || location.region].filter(Boolean);
+    if (parts.length) return parts.join(', ');
+    if (typeof location.lat === 'number' && typeof location.lng === 'number') {
+        return `${location.lat.toFixed(2)}, ${location.lng.toFixed(2)}`;
+    }
+    return null;
+};
+
+const ReceiverFlow = ({ apiKey, cardData, onExit }) => {
     const [showMap, setShowMap] = useState(false);
     const [fullscreenIndex, setFullscreenIndex] = useState(null);
     const containerRef = useRef(null);
@@ -44,6 +55,12 @@ const ReceiverFlow = ({ apiKey, cardData, onExit, layoutId }) => {
     ];
 
     const displayMedia = mediaArray.length > 0 ? mediaArray : mockMedia;
+    const locationLabel = formatLocationLabel(location);
+    const hasValidCoordinates = useMemo(
+        () => Boolean(location && typeof location.lat === 'number' && typeof location.lng === 'number'),
+        [location]
+    );
+    const mapPosition = hasValidCoordinates ? { lat: location.lat, lng: location.lng } : null;
 
     const handleDownload = () => {
         displayMedia.forEach((media, index) => {
@@ -64,10 +81,18 @@ const ReceiverFlow = ({ apiKey, cardData, onExit, layoutId }) => {
         setFullscreenIndex((prev) => (prev < displayMedia.length - 1 ? prev + 1 : 0));
     };
 
+    useEffect(() => {
+        if (!hasValidCoordinates && showMap) {
+            setShowMap(false);
+        }
+    }, [hasValidCoordinates, showMap]);
+
+    const handleToggleMap = () => {
+        setShowMap((prev) => !prev);
+    };
+
     return (
         <Box
-            component={motion.div}
-            layoutId={layoutId}
             sx={{
                 position: 'fixed',
                 top: 0,
@@ -95,8 +120,28 @@ const ReceiverFlow = ({ apiKey, cardData, onExit, layoutId }) => {
             }}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
                     <Typography variant="h5" sx={{ fontWeight: 'bold' }}>{title}</Typography>
-                    <Box>
-                        <IconButton onClick={() => setShowMap(!showMap)} color="primary" sx={{ mr: 1 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                        {locationLabel && (
+                            <Typography
+                                variant="body2"
+                                color="text.secondary"
+                                sx={{
+                                    maxWidth: 160,
+                                    whiteSpace: 'nowrap',
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    fontWeight: 500
+                                }}
+                            >
+                                {locationLabel}
+                            </Typography>
+                        )}
+                        <IconButton
+                            onClick={handleToggleMap}
+                            color="primary"
+                            sx={{ mr: 1 }}
+                            title={hasValidCoordinates ? 'Show map preview' : 'Map preview will show a placeholder until location is set'}
+                        >
                             {showMap ? <ViewCarouselIcon /> : <MapIcon />}
                         </IconButton>
                         <IconButton onClick={onExit} color="default">
@@ -108,72 +153,113 @@ const ReceiverFlow = ({ apiKey, cardData, onExit, layoutId }) => {
                     {description}
                 </Typography>
 
-                {/* Buttons side by side */}
-                <Box sx={{ display: 'flex', gap: 1 }}>
-                    <Button
-                        variant="outlined"
-                        startIcon={<DownloadIcon />}
-                        size="small"
-                        onClick={handleDownload}
-                        sx={{ flex: 1 }}
-                    >
-                        Download All ({displayMedia.length})
-                    </Button>
-                    <Button
-                        variant="contained"
-                        startIcon={<ViewInArIcon />}
-                        size="small"
-                        sx={{ flex: 1 }}
-                    >
-                        View in AR
-                    </Button>
-                </Box>
             </Box>
 
+            {/* Floating action buttons */}
+            {fullscreenIndex === null && (
+                <Box
+                    sx={{
+                        position: 'fixed',
+                        bottom: 16,
+                        left: 0,
+                        right: 0,
+                        px: 2,
+                        zIndex: 1500,
+                        pointerEvents: 'none'
+                    }}
+                >
+                    <Paper
+                        elevation={6}
+                        sx={{
+                            borderRadius: 3,
+                            p: 2,
+                            background: 'rgba(255,255,255,0.95)',
+                            pointerEvents: 'auto'
+                        }}
+                    >
+                        <Stack spacing={1.5}>
+                            <Button
+                                variant="contained"
+                                size="large"
+                                startIcon={<ViewInArIcon />}
+                                sx={{ borderRadius: 3 }}
+                            >
+                                View in AR
+                            </Button>
+                            <Button
+                                variant="outlined"
+                                size="large"
+                                startIcon={<DownloadIcon />}
+                                onClick={handleDownload}
+                                sx={{ borderRadius: 3, borderWidth: 2 }}
+                            >
+                                Download All ({displayMedia.length})
+                            </Button>
+                        </Stack>
+                    </Paper>
+                </Box>
+            )}
+
             {/* Main Content - with top padding for sticky header */}
-            <Box ref={containerRef} sx={{ pt: 25, px: 2, pb: 10, minHeight: '80vh' }}>
+            <Box ref={containerRef} sx={{ pt: 25, px: 2, pb: 20, minHeight: '80vh' }}>
                 {showMap ? (
-                    <LoadScript googleMapsApiKey={apiKey}>
-                        <GoogleMap
-                            mapContainerStyle={containerStyle}
-                            center={location || center}
-                            zoom={13}
+                    hasValidCoordinates ? (
+                        <LoadScript googleMapsApiKey={apiKey}>
+                            <GoogleMap
+                                mapContainerStyle={containerStyle}
+                                center={mapPosition || center}
+                                zoom={13}
+                            >
+                                <Marker position={mapPosition || center} />
+                            </GoogleMap>
+                        </LoadScript>
+                    ) : (
+                        <Paper
+                            elevation={0}
+                            sx={{
+                                p: 3,
+                                borderRadius: 2,
+                                bgcolor: 'grey.50',
+                                border: '1px dashed',
+                                borderColor: 'grey.300'
+                            }}
                         >
-                            <Marker position={location || center} />
-                        </GoogleMap>
-                    </LoadScript>
+                            <Typography variant="body2" color="text.secondary">
+                                Map preview will appear once this memory includes GPS coordinates.
+                            </Typography>
+                        </Paper>
+                    )
                 ) : (
-                    <Grid container spacing={2} sx={{ mb: 2 }}>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mb: 2 }}>
                         {displayMedia.map((media, index) => (
-                            <Grid item xs={12} key={index}>
-                                <Paper
-                                    elevation={3}
-                                    sx={{
-                                        width: '100%',
-                                        borderRadius: 2,
-                                        overflow: 'hidden',
-                                        cursor: 'pointer',
-                                        transition: 'transform 0.2s',
-                                        '&:hover': { transform: 'scale(1.02)' }
-                                    }}
-                                    onClick={() => setFullscreenIndex(index)}
-                                >
-                                    {media.type.startsWith('video/') ? (
-                                        <video
-                                            src={media.url}
-                                            style={{ width: '100%', height: 'auto', display: 'block' }}
-                                        />
-                                    ) : (
-                                        <img
-                                            src={media.url}
-                                            alt={`Memory ${index + 1}`}
-                                            style={{ width: '100%', height: 'auto', display: 'block' }}
-                                        />
-                                    )}
-                                </Paper>
-                            </Grid>
+                            <Paper
+                                key={index}
+                                elevation={3}
+                                sx={{
+                                    width: '100%',
+                                    borderRadius: 2,
+                                    overflow: 'hidden',
+                                    cursor: 'pointer',
+                                    transition: 'transform 0.2s',
+                                    '&:hover': { transform: 'scale(1.02)' }
+                                }}
+                                onClick={() => setFullscreenIndex(index)}
+                            >
+                                {media.type.startsWith('video/') ? (
+                                    <video
+                                        src={media.url}
+                                        style={{ width: '100%', height: 'auto', display: 'block' }}
+                                    />
+                                ) : (
+                                    <img
+                                        src={media.url}
+                                        alt={`Memory ${index + 1}`}
+                                        style={{ width: '100%', height: 'auto', display: 'block' }}
+                                    />
+                                )}
+                            </Paper>
                         ))}
-                    </Grid>
+                    </Box>
                 )}
             </Box>
 
@@ -272,34 +358,35 @@ const ReceiverFlow = ({ apiKey, cardData, onExit, layoutId }) => {
                     {/* Action Buttons in Fullscreen */}
                     <Box sx={{
                         position: 'absolute',
-                        bottom: 16,
-                        left: '50%',
-                        transform: 'translateX(-50%)',
-                        display: 'flex',
-                        gap: 1,
-                        width: '90%',
-                        maxWidth: 400
+                        bottom: 24,
+                        left: 0,
+                        right: 0,
+                        px: 3
                     }}>
-                        <Button
-                            variant="outlined"
-                            startIcon={<DownloadIcon />}
-                            onClick={handleDownload}
-                            sx={{
-                                flex: 1,
-                                color: 'white',
-                                borderColor: 'white',
-                                '&:hover': { borderColor: 'grey.300', bgcolor: 'rgba(255,255,255,0.1)' }
-                            }}
-                        >
-                            Download All ({displayMedia.length})
-                        </Button>
-                        <Button
-                            variant="contained"
-                            startIcon={<ViewInArIcon />}
-                            sx={{ flex: 1, bgcolor: 'primary.main' }}
-                        >
-                            View in AR
-                        </Button>
+                        <Stack spacing={1.5}>
+                            <Button
+                                variant="contained"
+                                startIcon={<ViewInArIcon />}
+                                fullWidth
+                                sx={{ borderRadius: 3, bgcolor: 'primary.main' }}
+                            >
+                                View in AR
+                            </Button>
+                            <Button
+                                variant="outlined"
+                                startIcon={<DownloadIcon />}
+                                onClick={handleDownload}
+                                fullWidth
+                                sx={{
+                                    borderRadius: 3,
+                                    color: 'white',
+                                    borderColor: 'white',
+                                    '&:hover': { borderColor: 'grey.300', bgcolor: 'rgba(255,255,255,0.1)' }
+                                }}
+                            >
+                                Download All ({displayMedia.length})
+                            </Button>
+                        </Stack>
                     </Box>
                 </Box>
             )}

@@ -1,5 +1,27 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Box, Typography, Button, Paper, Snackbar, Alert, Badge, Tabs, Tab, CircularProgress } from '@mui/material';
+import {
+    Box,
+    Typography,
+    Button,
+    Paper,
+    Snackbar,
+    Alert,
+    Badge,
+    Tabs,
+    Tab,
+    CircularProgress,
+    Stack,
+    IconButton,
+    Dialog,
+    DialogContent,
+    DialogTitle
+} from '@mui/material';
+import GoogleIcon from '@mui/icons-material/Google';
+import AppleIcon from '@mui/icons-material/Apple';
+import MailOutlineIcon from '@mui/icons-material/MailOutline';
+import TextsmsIcon from '@mui/icons-material/Textsms';
+import CloseIcon from '@mui/icons-material/Close';
+import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import SenderFlow from '../components/SenderFlow';
 import ReceiverFlow from '../components/ReceiverFlow';
 import CreateIcon from '@mui/icons-material/Create';
@@ -8,11 +30,12 @@ import SendIcon from '@mui/icons-material/Send';
 import CallReceivedIcon from '@mui/icons-material/CallReceived';
 import AllInclusiveIcon from '@mui/icons-material/AllInclusive';
 import { useLayout } from '../context/LayoutContext';
-import { motion } from 'framer-motion';
 import { sentPostcards, receivedPostcards } from '../data/mockData';
 import { gsap } from 'gsap';
 import { useAuth } from '../context/AuthContext';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { addUserCard, subscribeToUserCards } from '../lib/cardsRepository';
+import { GOOGLE_MAPS_API_KEY } from '../lib/maps';
 
 const FALLBACK_CARD_IMAGE = 'https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?auto=format&fit=crop&w=800&q=80';
 
@@ -22,14 +45,53 @@ const buildInitialCards = () => (
         .sort((a, b) => new Date(b.date) - new Date(a.date))
 );
 
+const normalizeRemoteCard = (card) => {
+    const parsedDate = (() => {
+        if (!card.date && card.createdAt?.toDate) {
+            return card.createdAt.toDate().toLocaleDateString();
+        }
+        if (!card.date) {
+            return new Date().toLocaleDateString();
+        }
+        if (typeof card.date === 'string') {
+            return card.date;
+        }
+        if (card.date?.toDate) {
+            return card.date.toDate().toLocaleDateString();
+        }
+        return new Date(card.date).toLocaleDateString();
+    })();
+
+    return {
+        ...card,
+        type: card.type || 'sent',
+        date: parsedDate,
+        image: card.image || FALLBACK_CARD_IMAGE,
+    };
+};
+
+const normalizeLocationForStorage = (location) => {
+    if (!location) return undefined;
+    if (typeof location === 'string') {
+        return { name: location };
+    }
+    if (!location.name && location.formatted_address) {
+        return { ...location, name: location.formatted_address };
+    }
+    return location;
+};
+
 const Exchange = () => {
     const [viewMode, setViewMode] = useState('default'); // 'default', 'sender', 'receiver'
     const [tabValue, setTabValue] = useState(0); // 0: All, 1: Sent, 2: Received
     const [cards, setCards] = useState(() => buildInitialCards());
     const { setIsFullscreen } = useLayout();
-    const { user } = useAuth();
+    const navigate = useNavigate();
+    const location = useLocation();
+    const { user, signIn, signInWithApple } = useAuth();
+    const resumeAction = location.state?.resumeAction;
 
-    const [notification, setNotification] = useState({ open: false, message: '' });
+    const [notification, setNotification] = useState({ open: false, message: '', severity: 'info' });
     const [hasPendingWrite, setHasPendingWrite] = useState(false);
     const [selectedCard, setSelectedCard] = useState(null);
     const [showNewCardIndicator, setShowNewCardIndicator] = useState(false);
@@ -37,6 +99,9 @@ const Exchange = () => {
     const [cardsLoading, setCardsLoading] = useState(false);
     const [cardsError, setCardsError] = useState(null);
     const indicatorBarRef = useRef(null);
+    const [authPromptAction, setAuthPromptAction] = useState(null);
+    const [authProcessing, setAuthProcessing] = useState(false);
+    const [tapCardPromptOpen, setTapCardPromptOpen] = useState(false);
 
     // Reset fullscreen when unmounting or switching to default
     useEffect(() => {
@@ -60,7 +125,8 @@ const Exchange = () => {
         const unsubscribe = subscribeToUserCards(
             user.uid,
             (remoteCards) => {
-                setCards(remoteCards.length ? remoteCards : buildInitialCards());
+                const normalizedCards = remoteCards.map(normalizeRemoteCard);
+                setCards(normalizedCards.length ? normalizedCards : buildInitialCards());
                 setCardsLoading(false);
             },
             (error) => {
@@ -80,6 +146,7 @@ const Exchange = () => {
     const handleSenderComplete = async (data) => {
         const previewMedia = data.media || [];
         const primaryMedia = previewMedia[0];
+        const normalizedLocation = normalizeLocationForStorage(data.location);
         const newCard = {
             title: data.title || 'New Memory',
             description: data.description,
@@ -88,7 +155,7 @@ const Exchange = () => {
             type: 'sent',
             sender: 'You',
             media: previewMedia,
-            location: data.location ? { name: data.location } : undefined
+            location: normalizedLocation
         };
         const tempId = `temp-${Date.now()}`;
         const cardForDisplay = { ...newCard, id: tempId };
@@ -101,31 +168,39 @@ const Exchange = () => {
         setViewMode('default');
 
         if (!user) {
-            setNotification({ open: true, message: 'Memory saved locally.' });
+            setNotification({ open: true, message: 'Memory saved locally.', severity: 'info' });
             return;
         }
 
         try {
-            const docId = await addUserCard(user.uid, cardPayload);
+            const docId = await addUserCard(user.uid, {
+                ...cardPayload,
+                ownerId: user.uid,
+            });
             setCards(prev => prev.map(card => card.id === tempId ? { ...card, id: docId } : card));
             setPendingCardId(docId);
-            setNotification({ open: true, message: 'Memory added to your history.' });
+            setNotification({ open: true, message: 'Memory embedded! Ready to be mailed.', severity: 'success' });
         } catch (error) {
             console.error('Failed to save card', error);
             setCards(prev => prev.filter(card => card.id !== tempId));
             setPendingCardId(null);
             setShowNewCardIndicator(false);
-            setNotification({ open: true, message: 'Unable to save your memory. Please try again.' });
+            setNotification({ open: true, message: 'Unable to save your memory. Please try again.', severity: 'error' });
         }
     };
 
     const handleSenderExit = () => {
         setHasPendingWrite(true);
-        setNotification({ open: true, message: "Memory hasn't been added to card properly" });
+        setNotification({ open: true, message: "Memory hasn't been added to card properly", severity: 'warning' });
         setViewMode('default');
     };
 
     const handleCardClick = (card) => {
+        if (!user) {
+            setSelectedCard(card);
+            setAuthPromptAction('receiver');
+            return;
+        }
         setSelectedCard(card);
         setViewMode('receiver');
     };
@@ -133,6 +208,71 @@ const Exchange = () => {
     const handleReceiverExit = () => {
         setSelectedCard(null);
         setViewMode('default');
+    };
+    const requestAction = (action) => {
+        if (user) {
+            setViewMode(action);
+            return;
+        }
+        setAuthPromptAction(action);
+    };
+
+    const handleTapCardChoice = (action) => {
+        setTapCardPromptOpen(false);
+        requestAction(action);
+    };
+
+    const closeTapCardPrompt = () => {
+        setTapCardPromptOpen(false);
+    };
+
+    const closeAuthPrompt = () => {
+        if (authProcessing) return;
+        setAuthPromptAction(null);
+        if (!user) {
+            setSelectedCard(null);
+        }
+    };
+
+    const finishAuthSuccess = () => {
+        if (!authPromptAction) return;
+        if (authPromptAction === 'sender') {
+            setViewMode('sender');
+        } else if (authPromptAction === 'receiver') {
+            setViewMode('receiver');
+        }
+        setAuthPromptAction(null);
+    };
+
+    const handleProviderSignIn = async (provider) => {
+        if (!authPromptAction) return;
+        setAuthProcessing(true);
+        try {
+            if (provider === 'google') {
+                await signIn();
+            } else if (provider === 'apple') {
+                await signInWithApple();
+            }
+            finishAuthSuccess();
+        } catch (error) {
+            console.error('Unable to sign in', error);
+            setNotification({ open: true, message: 'Unable to sign in. Please try again.', severity: 'error' });
+        } finally {
+            setAuthProcessing(false);
+        }
+    };
+
+    const handleNavigateLogin = (method) => {
+        if (!authPromptAction) return;
+        const actionToResume = authPromptAction;
+        navigate('/login', {
+            state: {
+                method,
+                from: location.pathname,
+                resumeAction: actionToResume
+            }
+        });
+        closeAuthPrompt();
     };
 
     const handleCloseNotification = () => {
@@ -165,13 +305,39 @@ const Exchange = () => {
         return () => ctx.revert();
     }, [showNewCardIndicator, cards, pendingCardId]);
 
+    useEffect(() => {
+        if (!user || !resumeAction) return;
+        if (resumeAction === 'sender') {
+            setViewMode('sender');
+        } else if (resumeAction === 'receiver') {
+            setViewMode('receiver');
+        } else if (resumeAction === 'tap-card') {
+            setTapCardPromptOpen(true);
+        }
+        navigate(location.pathname, { replace: true });
+    }, [user, resumeAction, navigate, location.pathname]);
+
+    const startTapCardFlow = location.state?.startTapCardFlow;
+
+    useEffect(() => {
+        if (!startTapCardFlow) return;
+        if (user) {
+            setTapCardPromptOpen(true);
+            navigate(location.pathname, { replace: true });
+        } else {
+            navigate('/login', {
+                state: {
+                    from: '/exchange',
+                    resumeAction: 'tap-card'
+                }
+            });
+        }
+    }, [startTapCardFlow, user, navigate, location.pathname]);
+
     // Filter cards based on tab
     const displayCards = tabValue === 0 ? cards :
         tabValue === 1 ? cards.filter(c => c.type === 'sent') :
             cards.filter(c => c.type === 'received');
-
-    // API Key from prompt
-    const GOOGLE_MAPS_API_KEY = 'AIzaSyCutvv7f2R1FV-ScEC_6gJfvMBCFAAYJdw';
 
     if (viewMode === 'sender') {
         return <SenderFlow onComplete={handleSenderComplete} onExit={handleSenderExit} />;
@@ -200,7 +366,6 @@ const Exchange = () => {
                 apiKey={GOOGLE_MAPS_API_KEY}
                 cardData={cardData}
                 onExit={handleReceiverExit}
-                layoutId={selectedCard ? `card-${selectedCard.id}` : undefined}
             />
         );
     }
@@ -214,6 +379,7 @@ const Exchange = () => {
     }
 
     return (
+        <>
         <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', gap: 3 }}>
             {/* Actions Section */}
             <Box sx={{ display: 'flex', gap: 2 }}>
@@ -227,21 +393,12 @@ const Exchange = () => {
                         variant="contained"
                         fullWidth
                         startIcon={<CreateIcon />}
-                        onClick={() => setViewMode('sender')}
+                        onClick={() => requestAction('sender')}
                         sx={{ py: 2, borderRadius: 3 }}
                     >
                         Write Message
                     </Button>
                 </Badge>
-                <Button
-                    variant="outlined"
-                    fullWidth
-                    startIcon={<NfcIcon />}
-                    onClick={() => setViewMode('receiver')}
-                    sx={{ py: 2, borderRadius: 3, borderWidth: 2, flex: 1 }}
-                >
-                    Read Card
-                </Button>
             </Box>
 
             {/* Tabs for Sent/Received/All */}
@@ -261,22 +418,21 @@ const Exchange = () => {
 
             {/* Cards List */}
             <Box>
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
                     {displayCards.map((item) => (
                         <React.Fragment key={item.id}>
                             <Paper
-                                component={motion.div}
-                                layoutId={`card-${item.id}`}
                                 onClick={() => handleCardClick(item)}
                                 elevation={2}
                                 sx={{
                                     p: 0,
-                                    borderRadius: 3,
+                                    borderRadius: 4,
                                     bgcolor: 'background.paper',
                                     overflow: 'hidden',
                                     display: 'flex',
                                     flexDirection: 'column',
                                     cursor: 'pointer',
+                                    minHeight: 360,
                                     '&:hover': { transform: 'scale(1.02)', transition: 'transform 0.2s' }
                                 }}
                             >
@@ -306,7 +462,7 @@ const Exchange = () => {
                                     <>
                                         <Box sx={{
                                             width: '100%',
-                                            height: 200,
+                                            height: { xs: 240, sm: 280 },
                                             position: 'relative',
                                             bgcolor: 'grey.200'
                                         }}>
@@ -320,12 +476,12 @@ const Exchange = () => {
                                                 }}
                                             />
                                         </Box>
-                                        <Box sx={{ p: 2 }}>
-                                            <Typography variant="h6" fontWeight="bold">{item.title}</Typography>
+                                        <Box sx={{ p: 3 }}>
+                                            <Typography variant="h6" fontWeight="bold" gutterBottom>{item.title}</Typography>
                                             {item.sender && (
-                                                <Typography variant="body2" color="text.secondary">From: {item.sender}</Typography>
+                                                <Typography variant="body1" color="text.secondary" sx={{ mb: 0.5 }}>From: {item.sender}</Typography>
                                             )}
-                                            <Typography variant="caption" color="text.secondary">{item.date}</Typography>
+                                            <Typography variant="body2" color="text.secondary">{item.date}</Typography>
                                         </Box>
                                     </>
                                 )}
@@ -343,11 +499,177 @@ const Exchange = () => {
                 anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
                 sx={{ bottom: { xs: 90, sm: 24 } }}
             >
-                <Alert onClose={handleCloseNotification} severity="error" sx={{ width: '100%', borderRadius: 2 }}>
+                <Alert
+                    onClose={handleCloseNotification}
+                    severity={notification.severity || 'info'}
+                    icon={notification.severity === 'success' ? <CheckCircleOutlineIcon fontSize="inherit" /> : undefined}
+                    sx={{ width: '100%', borderRadius: 2 }}
+                >
                     {notification.message}
                 </Alert>
             </Snackbar>
+
+            {Boolean(authPromptAction) && (
+                <Box
+                    sx={{
+                        position: 'fixed',
+                        inset: 0,
+                        zIndex: (theme) => theme.zIndex.modal + 1,
+                        display: 'flex'
+                    }}
+                >
+                    <Paper
+                        elevation={6}
+                        sx={{
+                            width: '100%',
+                            height: '100%',
+                            borderRadius: 0,
+                            bgcolor: 'rgba(255,255,255,0.98)',
+                            position: 'relative',
+                            display: 'flex',
+                            justifyContent: 'center',
+                            alignItems: 'center',
+                            p: { xs: 3, md: 6 }
+                        }}
+                    >
+                        <IconButton
+                            onClick={closeAuthPrompt}
+                            sx={{
+                                position: 'absolute',
+                                top: 16,
+                                right: 16
+                            }}
+                        >
+                            <CloseIcon />
+                        </IconButton>
+                        <Box sx={{ width: '100%', maxWidth: 520 }}>
+                            <Stack spacing={1.5} alignItems="center">
+                                <Typography
+                                    variant="h4"
+                                    sx={{
+                                        fontFamily: '"Adelia", "Pacifico", cursive',
+                                        background: 'linear-gradient(45deg, #0088FF 30%, #00C6FF 90%)',
+                                        WebkitBackgroundClip: 'text',
+                                        WebkitTextFillColor: 'transparent',
+                                        backgroundClip: 'text'
+                                    }}
+                                >
+                                    Homer
+                                </Typography>
+                                <Typography variant="h5" sx={{ fontWeight: 'medium', textAlign: 'center' }}>
+                                    {authPromptAction === 'sender' ? 'Save Your Memory' : 'Unlock This Memory'}
+                                </Typography>
+                                <Typography variant="body1" color="text.secondary" textAlign="center" sx={{ mt: 1 }}>
+                                    {authPromptAction === 'sender'
+                                        ? 'We attach every embedded story to your Homer account so you can edit it, share it, and keep it safe across devices.'
+                                        : 'Reading a memory registers it in your locker so you always know who shared it and never lose access.'}
+                                </Typography>
+                            </Stack>
+                            <Stack spacing={2} sx={{ mt: 4 }}>
+                                <Button
+                                    variant="contained"
+                                    size="large"
+                                    startIcon={<GoogleIcon />}
+                                    onClick={() => handleProviderSignIn('google')}
+                                    disabled={authProcessing}
+                                    sx={{ borderRadius: 50 }}
+                                >
+                                    Continue with Google
+                                </Button>
+                                <Button
+                                    variant="outlined"
+                                    size="large"
+                                    startIcon={<AppleIcon />}
+                                    onClick={() => handleProviderSignIn('apple')}
+                                    disabled={authProcessing}
+                                    sx={{ borderRadius: 50, borderColor: '#ddd' }}
+                                >
+                                    Continue with Apple
+                                </Button>
+                                <Button
+                                    variant="outlined"
+                                    size="large"
+                                    startIcon={<MailOutlineIcon />}
+                                    onClick={() => handleNavigateLogin('email')}
+                                    sx={{ borderRadius: 50, borderColor: '#ddd' }}
+                                >
+                                    Continue with Email
+                                </Button>
+                                <Button
+                                    variant="outlined"
+                                    size="large"
+                                    startIcon={<TextsmsIcon />}
+                                    onClick={() => handleNavigateLogin('sms')}
+                                    sx={{ borderRadius: 50, borderColor: '#ddd' }}
+                                >
+                                    Continue with SMS
+                                </Button>
+                            </Stack>
+                        </Box>
+                    </Paper>
+                </Box>
+            )}
         </Box>
+
+        <Dialog
+            open={tapCardPromptOpen}
+            onClose={closeTapCardPrompt}
+            fullScreen
+            PaperProps={{
+                sx: {
+                    bgcolor: 'rgba(0,0,0,0.7)',
+                    borderRadius: 0
+                }
+            }}
+        >
+            <DialogContent
+                sx={{
+                    bgcolor: 'background.paper',
+                    borderRadius: 0,
+                    p: { xs: 4, md: 6 },
+                    width: '100%',
+                    height: '100%',
+                    textAlign: 'center',
+                    boxShadow: 'none',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'center'
+                }}
+            >
+                <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+                    <IconButton onClick={closeTapCardPrompt}>
+                        <CloseIcon />
+                    </IconButton>
+                </Box>
+                <DialogTitle sx={{ textAlign: 'center', fontSize: 28, fontWeight: 'bold', pb: 1 }}>
+                    Tap Card
+                </DialogTitle>
+                <Typography variant="body1" color="text.secondary" sx={{ mb: 4 }}>
+                    Choose what you’d like to do with your Homer card.
+                </Typography>
+                <Stack spacing={2}>
+                    <Button
+                        variant="contained"
+                        size="large"
+                        startIcon={<CreateIcon />}
+                        onClick={() => handleTapCardChoice('sender')}
+                        sx={{ borderRadius: 3, py: 1.5 }}
+                    >
+                        Embed a Memory
+                    </Button>
+                    <Button
+                        variant="outlined"
+                        size="large"
+                        startIcon={<NfcIcon />}
+                        onClick={() => handleTapCardChoice('receiver')}
+                        sx={{ borderRadius: 3, py: 1.5, borderWidth: 2 }}
+                    >
+                        Read a Memory
+                    </Button>
+                </Stack>
+            </DialogContent>
+        </Dialog>
+        </>
     );
 };
 

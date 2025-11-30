@@ -1,17 +1,22 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Box, Button, Typography, Paper, Container, TextField, Divider, Stack, Alert } from '@mui/material';
 import GoogleIcon from '@mui/icons-material/Google';
 import AppleIcon from '@mui/icons-material/Apple';
 import PhoneIcon from '@mui/icons-material/Phone';
 import EmailIcon from '@mui/icons-material/Email';
 import { useAuth } from '../context/AuthContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { RecaptchaVerifier } from 'firebase/auth';
 import { auth } from '../lib/firebaseAuth';
 
 const Login = () => {
     const { signIn, signInWithApple, signInWithEmail, signUpWithEmail, signInWithPhone } = useAuth();
     const navigate = useNavigate();
+    const location = useLocation();
+    const locationState = location.state || {};
+    const fromPath = locationState.from || '/';
+    const resumeAction = locationState.resumeAction;
+    const requestedMethod = locationState.method;
     const [error, setError] = useState('');
     const [mode, setMode] = useState('select'); // select, email, phone
     const [isSignUp, setIsSignUp] = useState(false);
@@ -25,11 +30,28 @@ const Login = () => {
     const [verificationCode, setVerificationCode] = useState('');
     const [confirmationResult, setConfirmationResult] = useState(null);
 
+    useEffect(() => {
+        if (!requestedMethod) return;
+        if (requestedMethod === 'email') {
+            setMode('email');
+        } else if (requestedMethod === 'sms' || requestedMethod === 'phone') {
+            setMode('phone');
+        }
+    }, [requestedMethod]);
+
+    const navigateAfterAuth = () => {
+        if (resumeAction) {
+            navigate(fromPath, { state: { resumeAction } });
+        } else {
+            navigate(fromPath);
+        }
+    };
+
     const handleGoogleSignIn = async () => {
         try {
             setError('');
             await signIn();
-            navigate('/');
+            navigateAfterAuth();
         } catch (error) {
             console.error('Error signing in with Google:', error);
             setError(error.message || 'Failed to sign in');
@@ -40,7 +62,7 @@ const Login = () => {
         try {
             setError('');
             await signInWithApple();
-            navigate('/');
+            navigateAfterAuth();
         } catch (error) {
             console.error('Error signing in with Apple:', error);
             setError(error.message || 'Failed to sign in');
@@ -56,7 +78,7 @@ const Login = () => {
             } else {
                 await signInWithEmail(email, password);
             }
-            navigate('/');
+            navigateAfterAuth();
         } catch (error) {
             console.error('Error with email auth:', error);
             setError(error.message || 'Failed to authenticate');
@@ -96,7 +118,7 @@ const Login = () => {
         try {
             setError('');
             await confirmationResult.confirm(verificationCode);
-            navigate('/');
+            navigateAfterAuth();
         } catch (error) {
             console.error('Error verifying code:', error);
             setError(error.message || 'Invalid code');

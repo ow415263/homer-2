@@ -1,10 +1,14 @@
 import React, { useState } from 'react';
-import { IconButton, Box } from '@mui/material';
-import ChatIcon from '@mui/icons-material/Chat';
+import { IconButton, Box, useTheme, useMediaQuery } from '@mui/material';
 import ChatInterface from './ChatInterface';
+import homerLogo from '../assets/Homer_Logo.svg';
 
 const ChatButton = () => {
     const [isChatOpen, setIsChatOpen] = useState(false);
+    const theme = useTheme();
+    const isLgUp = useMediaQuery(theme.breakpoints.up('lg'));
+    const isXlUp = useMediaQuery(theme.breakpoints.up('xl'));
+    const chatOffset = isXlUp ? 230 : isLgUp ? 190 : 170;
 
     const handleToggleChat = () => {
         setIsChatOpen(!isChatOpen);
@@ -15,31 +19,46 @@ const ChatButton = () => {
             <Box
                 sx={{
                     position: 'fixed',
-                    bottom: 20,
-                    left: '50%',
-                    transform: 'translateX(calc(-50% + 170px))', // Position to the right of nav with more spacing
-                    zIndex: 1000,
-                    borderRadius: 50,
+                    bottom: { xs: 12, md: 20 },
+                    right: 16,
+                    left: { xs: 'auto', md: '50%' },
+                    transform: {
+                        xs: 'none',
+                        md: `translateX(calc(-50% + ${chatOffset}px))`,
+                    },
+                    zIndex: 1100,
+                    borderRadius: 999,
                     overflow: 'hidden',
-                    backgroundColor: 'rgba(255, 255, 255, 0.8)',
-                    backdropFilter: 'blur(12px)',
-                    boxShadow: '0 4px 30px rgba(0, 0, 0, 0.1)',
-                    border: '1px solid rgba(255, 255, 255, 0.3)',
-                    ml: 1.5 // Add margin-left for spacing between nav and chat
+                    width: { xs: 56, md: 64 },
+                    height: { xs: 56, md: 64 },
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: 'rgba(255,255,255,0.95)',
+                    boxShadow: 'none',
+                    border: '1px solid rgba(15, 23, 42, 0.15)',
+                    ml: { md: 1.5 }
                 }}
             >
                 <IconButton
                     onClick={handleToggleChat}
                     sx={{
-                        width: 64,
-                        height: 64, // Match nav height
+                        width: '100%',
+                        height: '100%',
                         color: 'primary.main',
+                        backgroundColor: 'transparent',
+                        borderRadius: 'inherit',
                         '&:hover': {
-                            bgcolor: 'rgba(0, 136, 255, 0.1)'
+                            bgcolor: 'rgba(15, 23, 42, 0.05)'
                         }
                     }}
                 >
-                    <ChatIcon fontSize="medium" />
+                    <Box
+                        component="img"
+                        src={homerLogo}
+                        alt="Open Homer chat"
+                        sx={{ width: 40, height: 40 }}
+                    />
                 </IconButton>
             </Box>
 

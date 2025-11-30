@@ -3,6 +3,7 @@ import { Box, TextField, IconButton, Typography, Paper, CircularProgress, Button
 import CloseIcon from '@mui/icons-material/Close';
 import SendIcon from '@mui/icons-material/Send';
 import OpenAI from 'openai';
+import homerLogo from '../assets/Homer_Logo.svg';
 
 const ChatInterface = ({ onClose }) => {
     const [messages, setMessages] = useState([
@@ -116,20 +117,37 @@ const ChatInterface = ({ onClose }) => {
                     p: 2,
                     borderBottom: '1px solid',
                     borderColor: 'divider',
+                    position: 'relative',
+                    bgcolor: 'primary.main',
+                    color: 'white',
                     display: 'flex',
                     alignItems: 'center',
-                    justifyContent: 'space-between',
-                    bgcolor: 'primary.main',
-                    color: 'white'
+                    justifyContent: 'space-between'
                 }}
             >
-                <Box>
-                    <Typography variant="h6" fontWeight="bold">
-                        Homer Assistant
-                    </Typography>
-                    <Typography variant="caption">
-                        Powered by AI
-                    </Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                    <Box
+                        component="img"
+                        src={homerLogo}
+                        alt="Homer logo"
+                        sx={{ width: 55, height: 55, filter: 'brightness(0) invert(1)' }}
+                    />
+                    <Box>
+                        <Typography
+                            variant="h6"
+                            sx={{
+                                fontFamily: 'Adelia, cursive',
+                                lineHeight: 1,
+                                color: 'white',
+                                fontSize: 14
+                            }}
+                        >
+                            Homer
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: 'white' }}>
+                            Assistant · Powered by AI
+                        </Typography>
+                    </Box>
                 </Box>
                 <IconButton onClick={onClose} sx={{ color: 'white' }}>
                     <CloseIcon />

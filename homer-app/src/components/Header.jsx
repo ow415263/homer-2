@@ -1,9 +1,10 @@
 import React from 'react';
-import { Box, Typography, IconButton, Button } from '@mui/material';
+import { Box, Typography, IconButton, Button, Avatar } from '@mui/material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import PersonIcon from '@mui/icons-material/Person';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import AutoFixHighIcon from '@mui/icons-material/AutoFixHigh';
+import NfcIcon from '@mui/icons-material/Nfc';
 import { useAuth } from '../context/AuthContext';
 
 const Header = () => {
@@ -11,7 +12,9 @@ const Header = () => {
     const location = useLocation();
     const isProfilePage = location.pathname === '/profile';
     const isCardsPage = location.pathname === '/cards';
-    const { user } = useAuth();
+    const { user, profile } = useAuth();
+    const avatarSrc = profile?.photoURL || user?.photoURL || null;
+    const avatarAlt = profile?.displayName || user?.displayName || 'Profile';
 
     const handleBack = () => {
         navigate(-1); // Go back to previous page
@@ -20,6 +23,20 @@ const Header = () => {
     const handleCreateCard = () => {
         // TODO: Open create card flow/dialog
         console.log('Create custom card clicked');
+    };
+
+    const handleTapCard = () => {
+        if (user) {
+            navigate('/exchange', { state: { startTapCardFlow: true } });
+            return;
+        }
+
+        navigate('/login', {
+            state: {
+                from: '/exchange',
+                resumeAction: 'tap-card'
+            }
+        });
     };
 
     return (
@@ -60,14 +77,15 @@ const Header = () => {
                             fontFamily: '"Adelia", "Pacifico", cursive',
                             fontSize: { xs: '1.2rem', sm: '1.4rem' },
                             fontWeight: 400,
-                            cursor: 'pointer'
+                            cursor: 'pointer',
+                            color: 'white'
                         }}
                         onClick={() => navigate('/')}
                     >
                         Homer
                     </Typography>
 
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
                         {isCardsPage && (
                             <Button
                                 variant="outlined"
@@ -89,18 +107,45 @@ const Header = () => {
                                 Custom
                             </Button>
                         )}
+                        <Button
+                            variant="contained"
+                            color="secondary"
+                            startIcon={<NfcIcon />}
+                            onClick={handleTapCard}
+                            sx={{
+                                textTransform: 'none',
+                                fontWeight: 'bold',
+                                borderRadius: 3,
+                                bgcolor: 'white',
+                                color: 'primary.main',
+                                '&:hover': {
+                                    bgcolor: 'rgba(255,255,255,0.9)'
+                                }
+                            }}
+                        >
+                            Tap Card
+                        </Button>
                         {user ? (
                             <IconButton
                                 onClick={() => navigate('/profile')}
                                 sx={{
                                     color: 'white',
                                     bgcolor: 'transparent',
+                                    p: 0.5,
                                     '&:hover': {
                                         bgcolor: 'rgba(255, 255, 255, 0.1)'
                                     }
                                 }}
                             >
-                                <PersonIcon />
+                                {avatarSrc ? (
+                                    <Avatar
+                                        src={avatarSrc}
+                                        alt={avatarAlt}
+                                        sx={{ width: 36, height: 36, border: '2px solid rgba(255,255,255,0.6)' }}
+                                    />
+                                ) : (
+                                    <PersonIcon />
+                                )}
                             </IconButton>
                         ) : (
                             <Button

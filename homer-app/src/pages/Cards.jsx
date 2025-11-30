@@ -1,10 +1,42 @@
 import React, { useState } from 'react';
-import { Box, Typography, Tabs, Tab, Card, CardMedia, CardContent, CardActionArea, Chip } from '@mui/material';
+import {
+    Box,
+    Typography,
+    Tabs,
+    Tab,
+    Card,
+    CardMedia,
+    CardContent,
+    CardActionArea,
+    Chip,
+    Dialog,
+    Button,
+    Stack,
+    IconButton
+} from '@mui/material';
+import CloseIcon from '@mui/icons-material/Close';
 import { phygitalCards, eCardThemes } from '../data/mockData';
 
 const Cards = () => {
     const [tabValue, setTabValue] = useState(0);
     const [selectedCategory, setSelectedCategory] = useState('all');
+    const [detailCard, setDetailCard] = useState(null);
+
+    const formatLabel = (value) => (value ? value.charAt(0).toUpperCase() + value.slice(1) : '');
+    const getRarityLabel = (card) => card.collectableLevel || (card?.category === 'limited' ? 'Signature' : 'Classic');
+    const getTagChips = (card) => {
+        if (!card) return [];
+        if (card.variant === 'phygital') {
+            return [
+                `Rarity: ${getRarityLabel(card)}`,
+                card.category ? `${formatLabel(card.category)} Edition` : 'Collector Series'
+            ];
+        }
+        return [
+            card.category ? `${formatLabel(card.category)} Theme` : 'Digital Collection',
+            'Instant Delivery'
+        ];
+    };
 
     const handleTabChange = (event, newValue) => {
         setTabValue(newValue);
@@ -136,7 +168,7 @@ const Cards = () => {
         return eCardThemesData.filter(card => card.category === selectedCategory);
     };
 
-    const CardSection = ({ title, cards }) => (
+    const CardSection = ({ title, cards, variant = 'phygital' }) => (
         <Box sx={{ mb: 4 }}>
             <Typography variant="h6" sx={{ mb: 2, fontWeight: 'bold' }}>{title}</Typography>
             <Box sx={{
@@ -153,17 +185,17 @@ const Cards = () => {
                 msOverflowStyle: 'none', // Hide scrollbar for IE/Edge
             }}>
                 {cards.map((card) => (
-                    <Card key={card.id} sx={{ minWidth: 180, maxWidth: 180, borderRadius: 2, boxShadow: 1, flexShrink: 0 }}>
-                        <CardActionArea>
+                    <Card key={card.id} sx={{ minWidth: 270, maxWidth: 270, borderRadius: 3, boxShadow: 2, flexShrink: 0 }}>
+                        <CardActionArea onClick={() => setDetailCard({ ...card, variant })}>
                             <CardMedia
                                 component="img"
-                                height="120"
+                                height="180"
                                 image={card.image}
                                 alt={card.title}
                             />
-                            <CardContent sx={{ p: 1.5 }}>
-                                <Typography variant="subtitle2" fontWeight="bold" noWrap>{card.title}</Typography>
-                                {card.price && <Typography variant="body2" color="text.secondary">{card.price}</Typography>}
+                            <CardContent sx={{ p: 2.5 }}>
+                                <Typography variant="subtitle1" fontWeight="bold" noWrap>{card.title}</Typography>
+                                {card.price && <Typography variant="body1" color="text.secondary">{card.price}</Typography>}
                             </CardContent>
                         </CardActionArea>
                     </Card>
@@ -197,20 +229,33 @@ const Cards = () => {
                 scrollbarWidth: 'none', // Hide scrollbar for Firefox
                 msOverflowStyle: 'none', // Hide scrollbar for IE/Edge
             }}>
-                {(tabValue === 0 ? phygitalCategories : eCardCategories).map((category) => (
-                    <Chip
-                        key={category.id}
-                        label={category.label}
-                        onClick={() => handleCategoryChange(category.id)}
-                        color={selectedCategory === category.id ? 'primary' : 'default'}
-                        variant={selectedCategory === category.id ? 'filled' : 'outlined'}
-                        sx={{
-                            fontWeight: selectedCategory === category.id ? 'bold' : 'normal',
-                            cursor: 'pointer',
-                            flexShrink: 0,
-                        }}
-                    />
-                ))}
+                {(tabValue === 0 ? phygitalCategories : eCardCategories).map((category) => {
+                    const isSelected = selectedCategory === category.id;
+
+                    return (
+                        <Chip
+                            key={category.id}
+                            label={category.label}
+                            onClick={() => handleCategoryChange(category.id)}
+                            color={isSelected ? 'primary' : 'default'}
+                            variant={isSelected ? 'filled' : 'outlined'}
+                            sx={{
+                                cursor: 'pointer',
+                                flexShrink: 0,
+                                borderRadius: '999px',
+                                height: 48,
+                                minWidth: 96,
+                                px: 0.5,
+                                '& .MuiChip-label': {
+                                    px: 2.75,
+                                    py: 1.1,
+                                    fontSize: 15,
+                                    fontWeight: isSelected ? 700 : 500,
+                                },
+                            }}
+                        />
+                    );
+                })}
             </Box>
 
             {/* Phygital Cards Section */}
@@ -219,14 +264,14 @@ const Cards = () => {
                     <Box>
                         {selectedCategory === 'all' ? (
                             <>
-                                <CardSection title="Collectable Cards" cards={collectableCards} />
-                                <CardSection title="Christmas Cards" cards={christmasCards} />
-                                <CardSection title="Travel Cards" cards={travelCards} />
-                                <CardSection title="Birthday Cards" cards={birthdayCards} />
-                                <CardSection title="Limited Edition Cards" cards={limitedEditionCards} />
+                                <CardSection title="Collectable Cards" cards={collectableCards} variant="phygital" />
+                                <CardSection title="Christmas Cards" cards={christmasCards} variant="phygital" />
+                                <CardSection title="Travel Cards" cards={travelCards} variant="phygital" />
+                                <CardSection title="Birthday Cards" cards={birthdayCards} variant="phygital" />
+                                <CardSection title="Limited Edition Cards" cards={limitedEditionCards} variant="phygital" />
                             </>
                         ) : (
-                            <CardSection title={phygitalCategories.find(c => c.id === selectedCategory)?.label || 'Cards'} cards={getFilteredCards()} />
+                            <CardSection title={phygitalCategories.find(c => c.id === selectedCategory)?.label || 'Cards'} cards={getFilteredCards()} variant="phygital" />
                         )}
                     </Box>
                 )}
@@ -238,19 +283,115 @@ const Cards = () => {
                     <Box>
                         {selectedCategory === 'all' ? (
                             <>
-                                <CardSection title="Celebration" cards={eCardThemesData.filter(c => c.category === 'celebration')} />
-                                <CardSection title="Holiday" cards={eCardThemesData.filter(c => c.category === 'holiday')} />
-                                <CardSection title="Nature" cards={eCardThemesData.filter(c => c.category === 'nature')} />
-                                <CardSection title="Abstract" cards={eCardThemesData.filter(c => c.category === 'abstract')} />
-                                <CardSection title="Love & Romance" cards={eCardThemesData.filter(c => c.category === 'love')} />
-                                <CardSection title="Seasonal" cards={eCardThemesData.filter(c => c.category === 'seasonal')} />
+                                <CardSection title="Celebration" cards={eCardThemesData.filter(c => c.category === 'celebration')} variant="digital" />
+                                <CardSection title="Holiday" cards={eCardThemesData.filter(c => c.category === 'holiday')} variant="digital" />
+                                <CardSection title="Nature" cards={eCardThemesData.filter(c => c.category === 'nature')} variant="digital" />
+                                <CardSection title="Abstract" cards={eCardThemesData.filter(c => c.category === 'abstract')} variant="digital" />
+                                <CardSection title="Love & Romance" cards={eCardThemesData.filter(c => c.category === 'love')} variant="digital" />
+                                <CardSection title="Seasonal" cards={eCardThemesData.filter(c => c.category === 'seasonal')} variant="digital" />
                             </>
                         ) : (
-                            <CardSection title={eCardCategories.find(c => c.id === selectedCategory)?.label || 'E-Cards'} cards={getFilteredECards()} />
+                            <CardSection title={eCardCategories.find(c => c.id === selectedCategory)?.label || 'E-Cards'} cards={getFilteredECards()} variant="digital" />
                         )}
                     </Box>
                 )}
             </Box>
+
+            <Dialog
+                open={Boolean(detailCard)}
+                onClose={() => setDetailCard(null)}
+                fullScreen
+                PaperProps={{ sx: { m: 0, borderRadius: 0 } }}
+            >
+                {detailCard && (
+                    <Box
+                        sx={{
+                            width: '100%',
+                            height: '100%',
+                            bgcolor: 'background.default',
+                            p: { xs: 3, md: 6 }
+                        }}
+                    >
+                        <Stack spacing={{ xs: 2, md: 3 }} sx={{ height: '100%' }}>
+                            <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+                                <IconButton aria-label="Close details" onClick={() => setDetailCard(null)}>
+                                    <CloseIcon />
+                                </IconButton>
+                            </Box>
+                            <Stack
+                                direction={{ xs: 'column', md: 'row' }}
+                                spacing={{ xs: 3, md: 6 }}
+                                sx={{ flex: 1 }}
+                            >
+                                <Box
+                                    component="img"
+                                    src={detailCard.image}
+                                    alt={detailCard.title}
+                                    sx={{
+                                        width: { xs: '100%', md: '55%' },
+                                        height: { xs: '45vh', md: '100%' },
+                                        objectFit: 'cover',
+                                        borderRadius: 3,
+                                        boxShadow: 4
+                                    }}
+                                />
+                                <Stack spacing={2.5} sx={{ flex: 1 }}>
+                                    <Box>
+                                        <Typography variant="h4" fontWeight="bold" gutterBottom>
+                                            {detailCard.title}
+                                        </Typography>
+                                        {detailCard.price && (
+                                            <Typography variant="h5" fontWeight="bold" gutterBottom>
+                                                {detailCard.price}
+                                            </Typography>
+                                        )}
+                                        <Stack
+                                            direction="row"
+                                            spacing={1.5}
+                                            flexWrap="wrap"
+                                            useFlexGap
+                                            sx={{ gap: 1.5, mb: 2 }}
+                                        >
+                                            {getTagChips(detailCard).map((chip) => (
+                                                <Chip key={chip} label={chip} variant="outlined" size="medium" />
+                                            ))}
+                                        </Stack>
+                                        <Typography variant="body1" color="text.secondary" sx={{ maxWidth: 540 }}>
+                                            {detailCard.description || `This ${detailCard.variant === 'phygital' ? 'phygital collectible' : 'digital card'} captures the spirit of ${detailCard.title}. Customize it with your memories and share instantly.`}
+                                        </Typography>
+                                    </Box>
+                                    {detailCard.variant === 'phygital' && (
+                                        <Box>
+                                            <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
+                                                Availability
+                                            </Typography>
+                                            <Typography variant="body2" color="text.secondary">
+                                                Pick up at select retailers or have it shipped directly to your home.
+                                            </Typography>
+                                        </Box>
+                                    )}
+                                    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ mt: 'auto' }}>
+                                        {detailCard.variant === 'phygital' ? (
+                                            <>
+                                                <Button variant="outlined" fullWidth onClick={() => setDetailCard(null)}>
+                                                    Find Retail Location
+                                                </Button>
+                                                <Button variant="contained" fullWidth onClick={() => setDetailCard(null)}>
+                                                    Deliver to My Home
+                                                </Button>
+                                            </>
+                                        ) : (
+                                            <Button variant="contained" fullWidth onClick={() => setDetailCard(null)}>
+                                                Send Digital Card
+                                            </Button>
+                                        )}
+                                    </Stack>
+                                </Stack>
+                            </Stack>
+                        </Stack>
+                    </Box>
+                )}
+            </Dialog>
         </Box>
     );
 };
